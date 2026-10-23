@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>لوحة الإدارة</title>
+<style>
+  :root { --bg:#f5f6fa; --card:#fff; --ink:#1d2433; --accent:#2f6fed; --muted:#6b7385; --ok:#1a8f4c; --err:#c0392b; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,"Segoe UI",Tahoma,sans-serif; background:var(--bg); color:var(--ink); }
+  main { max-width:900px; margin:0 auto; padding:16px; }
+  .card { background:var(--card); border-radius:14px; padding:16px; box-shadow:0 1px 6px rgba(0,0,0,.08); margin-top:14px; }
+  h1,h2 { margin:6px 0 10px; }
+  input,select { padding:9px; border:1px solid #cfd5e2; border-radius:8px; font-size:.95rem; }
+  button { padding:9px 14px; border:0; border-radius:8px; background:var(--accent); color:#fff; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--accent); border:1px solid var(--accent); }
+  button.danger { background:var(--err); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:6px 0; }
+  .grow { flex:1; min-width:120px; }
+  .scroll { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:.92rem; }
+  th,td { padding:9px 6px; border-bottom:1px solid #eef0f5; text-align:right; }
+  tr.click { cursor:pointer; } tr.click:hover { background:#f7f9ff; }
+  .tag { display:inline-block; padding:2px 9px; border-radius:8px; font-size:.82rem; }
+  .tag.ok { background:#e5f6ec; color:var(--ok); } .tag.off { background:#fdeaea; color:var(--err); }
+  .muted { color:var(--muted); font-size:.88rem; }
+  .msg { min-height:1.2em; margin-top:8px; } .msg.err{color:var(--err)} .msg.ok{color:var(--ok)}
+  .hidden { display:none; }
+  .field { display:flex; flex-direction:column; gap:4px; margin:10px 0; }
+  .field label { font-size:.9rem; color:var(--muted); }
+  .kv { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #eef0f5; font-size:.92rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>لوحة الإدارة</h1>
+
+  <section id="loginBox" class="card">
+    <div class="row">
+      <input id="email" type="email" placeholder="بريد الإدارة" class="grow">
+      <input id="password" type="password" placeholder="كلمة المرور" class="grow">
+      <button id="loginBtn">دخول</button>
+    </div>
+  </section>
+
+  <div id="panel" class="hidden">
+    <div class="card">
+      <div class="row">
+        <button id="navList">الأعضاء</button>
+        <button id="navSettings" class="ghost">الإعدادات</button>
+        <button id="navLog" class="ghost">سجل العمليات</button>
+        <button id="logout" class="ghost" style="margin-inline-start:auto">خروج</button>
+      </div>
+    </div>
+
+    <!-- قائمة الأعضاء -->
+    <section id="viewList" class="card">
+      <h2>الأعضاء</h2>
+      <div class="row">
+        <select id="searchType"><option value="name">اسم</option><option value="no">رقم</option><option value="email">بريد</option></select>
+        <input id="search" class="grow" placeholder="بحث">
+        <button id="searchBtn">بحث</button>
+        <button id="clearBtn" class="ghost">مسح</button>
+      </div>
+      <div class="row">
+        <select id="statusFilter"><option value="">كل الحالات</option><option value="active">نشط</option><option value="stopped">متوقف</option></select>
+        <select id="sortBy"><option value="new">الأحدث</option><option value="points">الأعلى نقاطًا</option></select>
+        <span class="muted" id="hint"></span>
+      </div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>الرقم</th><th>الاسم</th><th>النقاط</th><th>الحالة</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="row">
+        <button id="prevBtn" class="ghost">السابق</button>
+        <button id="nextBtn" class="ghost">التالي</button>
+        <span class="muted" id="pageInfo"></span>
+      </div>
+    </section>
+
+    <!-- صفحة العضو -->
+    <section id="viewDetail" class="card hidden">
+      <div class="row"><button id="backBtn" class="ghost">رجوع</button><h2 id="dTitle" style="margin:0"></h2></div>
+      <div class="kv"><span>البريد</span><span id="dEmail"></span></div>
+      <div class="kv"><span>تاريخ التسجيل</span><span id="dCreated"></span></div>
+      <div class="field"><label for="dName">الاسم</label><input id="dName" maxlength="40"></div>
+      <div class="field"><label for="dPoints">النقاط</label><input id="dPoints" type="number" step="1"></div>
+      <div class="field"><label for="dStatus">الحالة</label><select id="dStatus"><option value="active">نشط</option><option value="stopped">متوقف</option></select></div>
+      <div class="row"><button id="dSave">حفظ</button><button id="dDelete" class="danger">حذف الحساب</button></div>
+      <h3>سجل نقاط العضو</h3>
+      <div class="scroll"><table><tbody id="dLog"></tbody></table></div>
+    </section>
+
+    <!-- الإعدادات -->
+    <section id="viewSettings" class="card hidden">
+      <h2>إعدادات النظام</h2>
+      <div class="row"><label><input id="sRegOpen" type="checkbox"> التسجيل مفتوح</label></div>
+      <div class="row"><label><input id="sRewOpen" type="checkbox"> المكافآت مفتوحة (مفتاح عام)</label></div>
+      <div class="field"><label for="sCap">الحد الأقصى للتسجيل في اليوم (0 = بلا حد)</label><input id="sCap" type="number" min="0" step="1" style="max-width:160px"></div>
+      <h2>المكافأة اليومية</h2>
+      <div class="row">
+        <label>عدد النقاط <input id="sPoints" type="number" min="0" step="1" style="width:100px"></label>
+        <label><input id="sEnabled" type="checkbox"> مفعّلة</label>
+      </div>
+      <button id="sSave">حفظ الإعدادات</button>
+      <p class="muted">الأيام والتواريخ في الحد اليومي بالتوقيت العالمي (UTC).</p>
+    </section>
+
+    <!-- سجل العمليات -->
+    <section id="viewLog" class="card hidden">
+      <h2>سجل عمليات الإدارة</h2>
+      <div class="scroll"><table><thead><tr><th>الوقت</th><th>العملية</th><th>العضو</th><th>التفاصيل</th></tr></thead><tbody id="logRows"></tbody></table></div>
+      <div class="row"><button id="logNext" class="ghost">المزيد</button></div>
+    </section>
+  </div>
+
+  <div id="msg" class="msg"></div>
+</main>
+
+<script type="module">
+import { firebaseConfig, ADMIN_EMAIL } from "./firebase-config.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, getDocs, collection, writeBatch, serverTimestamp,
+         query, orderBy, where, limit, startAt, endAt, startAfter }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const $ = id => document.getElementById(id);
+const PAGE = 50;
+const pad = n => n ? "#" + String(n).padStart(4, "0") : "—";
+const fmt = t => t && t.toDate ? t.toDate().toLocaleString("ar") : "";
+
+function say(t, k) { $("msg").textContent = t || ""; $("msg").className = "msg " + (k || ""); }
+function adminLog(batch, action, target, details) {
+  batch.set(doc(collection(db, "adminLog")), {
+    by: auth.currentUser.email, at: serverTimestamp(), action,
+    targetUid: target ? target.id : "", memberNo: target && target.memberNo ? target.memberNo : 0, details,
+  });
+}
+
+$("loginBtn").onclick = async () => {
+  try { await signInWithEmailAndPassword(auth, $("email").value.trim(), $("password").value); }
+  catch { say("بيانات الدخول غير صحيحة.", "err"); }
+};
+$("logout").onclick = () => signOut(auth);
+
+onAuthStateChanged(auth, async user => {
+  const ok = user && user.emailVerified && user.email === ADMIN_EMAIL;
+  $("loginBox").classList.toggle("hidden", !!ok);
+  $("panel").classList.toggle("hidden", !ok);
+  if (user && !ok) { say("هذا الحساب ليس حساب الإدارة.", "err"); await signOut(auth); return; }
+  if (ok) route();
+});
+
+// ---------- التنقل ----------
+function showView(name) {
+  for (const v of ["List","Detail","Settings","Log"]) $("view" + v).classList.toggle("hidden", v !== name);
+  $("navList").className = name === "List" || name === "Detail" ? "" : "ghost";
+  $("navSettings").className = name === "Settings" ? "" : "ghost";
+  $("navLog").className = name === "Log" ? "" : "ghost";
+}
+$("navList").onclick = () => { location.hash = ""; route(); };
+$("navSettings").onclick = () => { location.hash = "#settings"; };
+$("navLog").onclick = () => { location.hash = "#log"; };
+$("backBtn").onclick = () => { location.hash = ""; };
+window.addEventListener("hashchange", () => { if (auth.currentUser) route(); });
+
+function route() {
+  say("");
+  const h = location.hash;
+  if (h.startsWith("#u/")) { showView("Detail"); loadDetail(h.slice(3)); }
+  else if (h === "#settings") { showView("Settings"); loadSettings(); }
+  else if (h === "#log") { showView("Log"); loadLog(true); }
+  else { showView("List"); loadList(0); }
+}
+
+// ---------- قائمة الأعضاء ----------
+let cursors = [null];   // مؤشر بداية كل صفحة
+let pageIdx = 0, lastDocs = [], searching = false;
+
+function buildQuery(cursor) {
+  const col = collection(db, "users");
+  const q = $("search").value.trim();
+  searching = false;
+  if (q) {
+    searching = true;
+    const t = $("searchType").value;
+    if (t === "no") return query(col, where("memberNo", "==", Number(q.replace("#", ""))), limit(PAGE));
+    if (t === "email") return query(col, where("email", "==", q.toLowerCase()), limit(PAGE));
+    const lo = q.toLowerCase();
+    return query(col, orderBy("nameLower"), startAt(lo), endAt(lo + "\uf8ff"), limit(PAGE));
+  }
+  const st = $("statusFilter").value;
+  const parts = [];
+  if (st) parts.push(where("status", "==", st));
+  else if ($("sortBy").value === "points") parts.push(orderBy("points", "desc"));
+  else parts.push(orderBy("createdAt", "desc"));
+  if (cursor) parts.push(startAfter(cursor));
+  parts.push(limit(PAGE));
+  return query(col, ...parts);
+}
+
+async function loadList(idx) {
+  pageIdx = idx;
+  if (idx === 0) cursors = [null];
+  $("hint").textContent = $("statusFilter").value && $("sortBy").value === "points" ? "الفرز بالنقاط يعمل مع كل الحالات فقط" : "";
+  try {
+    const snap = await getDocs(buildQuery(cursors[idx]));
+    lastDocs = snap.docs;
+    const tb = $("rows"); tb.textContent = "";
+    if (!snap.size) { const tr = tb.insertRow(); const td = tr.insertCell(); td.colSpan = 4; td.className = "muted"; td.textContent = "لا نتائج."; }
+    snap.forEach(d => {
+      const u = d.data(), tr = tb.insertRow(); tr.className = "click";
+      tr.insertCell().textContent = pad(u.memberNo);
+      tr.insertCell().textContent = u.name;
+      tr.insertCell().textContent = u.points;
+      const sc = tr.insertCell(), tag = document.createElement("span");
+      tag.className = "tag " + (u.status === "active" ? "ok" : "off");
+      tag.textContent = u.status === "active" ? "نشط" : "متوقف";
+      sc.append(tag);
+      tr.onclick = () => { location.hash = "#u/" + d.id; };
+    });
+    $("prevBtn").disabled = idx === 0 || searching;
+    $("nextBtn").disabled = snap.size < PAGE || searching;
+    $("pageInfo").textContent = `الصفحة ${idx + 1} · ${snap.size} عضو`;
+  } catch (e) {
+    say("تعذّر تحميل الأعضاء. " + (String(e.message || "").includes("index") ? "الاستعلام يحتاج فهرسًا." : ""), "err");
+  }
+}
+$("searchBtn").onclick = () => loadList(0);
+$("clearBtn").onclick = () => { $("search").value = ""; loadList(0); };
+$("statusFilter").onchange = () => loadList(0);
+$("sortBy").onchange = () => loadList(0);
+$("search").onkeydown = e => { if (e.key === "Enter") loadList(0); };
+$("nextBtn").onclick = () => { cursors[pageIdx + 1] = lastDocs[lastDocs.length - 1]; loadList(pageIdx + 1); };
+$("prevBtn").onclick = () => loadList(pageIdx - 1);
+
+// ---------- صفحة العضو ----------
+let current = null;
+async function loadDetail(uid) {
+  try {
+    const s = await getDoc(doc(db, "users", uid));
+    if (!s.exists()) { say("العضو غير موجود.", "err"); location.hash = ""; return; }
+    current = { id: uid, ...s.data() };
+    $("dTitle").textContent = pad(current.memberNo) + " " + current.name;
+    $("dEmail").textContent = current.email;
+    $("dCreated").textContent = fmt(current.createdAt);
+    $("dName").value = current.name;
+    $("dPoints").value = current.points;
+    $("dStatus").value = current.status === "active" ? "active" : "stopped";
+    const ls = await getDocs(query(collection(db, "users", uid, "log"), orderBy("at", "desc"), limit(20)));
+    const tb = $("dLog"); tb.textContent = "";
+    ls.forEach(x => {
+      const d = x.data(), tr = tb.insertRow();
+      tr.insertCell().textContent = fmt(d.at);
+      tr.insertCell().textContent = (d.delta > 0 ? "+" : "") + d.delta;
+      tr.insertCell().textContent = d.reason === "daily" ? "مكافأة يومية" : "تعديل من الإدارة";
+    });
+  } catch { say("تعذّر تحميل العضو.", "err"); }
+}
+$("dSave").onclick = async () => {
+  const nm = $("dName").value.trim().slice(0, 40);
+  const pts = Math.floor(Number($("dPoints").value));
+  const st = $("dStatus").value;
+  if (!nm || !Number.isFinite(pts)) return say("تحقق من الاسم والنقاط.", "err");
+  const ch = [];
+  if (nm !== current.name) ch.push(`الاسم: ${current.name} ← ${nm}`);
+  if (pts !== current.points) ch.push(`النقاط: ${current.points} ← ${pts}`);
+  if (st !== current.status) ch.push(`الحالة: ${current.status} ← ${st}`);
+  if (!ch.length) return say("لا تغييرات.", "err");
+  try {
+    const b = writeBatch(db), ref = doc(db, "users", current.id);
+    b.update(ref, { name: nm, nameLower: nm.toLowerCase(), points: pts, status: st });
+    if (pts !== current.points) b.set(doc(collection(ref, "log")), { delta: pts - current.points, reason: "admin", by: auth.currentUser.email, at: serverTimestamp() });
+    adminLog(b, "edit_user", current, ch.join(" | "));
+    await b.commit();
+    say("تم الحفظ.", "ok");
+    loadDetail(current.id);
+  } catch { say("تعذّر الحفظ.", "err"); }
+};
+$("dDelete").onclick = async () => {
+  if (!confirm(`حذف حساب ${current.name} نهائيًا؟ يفضّل تحويله إلى «متوقف» بدل الحذف.`)) return;
+  try {
+    const b = writeBatch(db);
+    b.delete(doc(db, "users", current.id));
+    adminLog(b, "delete_user", current, `حذف ${current.name} (${current.email})`);
+    await b.commit();
+    say("تم الحذف.", "ok"); location.hash = "";
+  } catch { say("تعذّر الحذف.", "err"); }
+};
+
+// ---------- الإعدادات ----------
+async function loadSettings() {
+  try {
+    const [a, d] = await Promise.all([getDoc(doc(db, "config", "app")), getDoc(doc(db, "config", "daily"))]);
+    const A = a.exists() ? a.data() : { registrationOpen: true, rewardsOpen: true, dailyCap: 200 };
+    const D = d.exists() ? d.data() : { points: 10, enabled: false };
+    $("sRegOpen").checked = A.registrationOpen !== false;
+    $("sRewOpen").checked = A.rewardsOpen !== false;
+    $("sCap").value = A.dailyCap ?? 200;
+    $("sPoints").value = D.points; $("sEnabled").checked = !!D.enabled;
+  } catch { say("تعذّر تحميل الإعدادات.", "err"); }
+}
+$("sSave").onclick = async () => {
+  const cap = Math.max(0, Math.floor(Number($("sCap").value) || 0));
+  const pts = Math.max(0, Math.floor(Number($("sPoints").value) || 0));
+  try {
+    const b = writeBatch(db);
+    b.set(doc(db, "config", "app"), { registrationOpen: $("sRegOpen").checked, rewardsOpen: $("sRewOpen").checked, dailyCap: cap });
+    b.set(doc(db, "config", "daily"), { points: pts, enabled: $("sEnabled").checked });
+    const c = await getDoc(doc(db, "counters", "members"));
+    if (!c.exists()) b.set(doc(db, "counters", "members"), { next: 1 });
+    adminLog(b, "settings", null, `تسجيل:${$("sRegOpen").checked} مكافآت:${$("sRewOpen").checked} حد يومي:${cap} نقاط يومية:${pts} مفعّلة:${$("sEnabled").checked}`);
+    await b.commit();
+    say("تم حفظ الإعدادات.", "ok");
+  } catch { say("تعذّر الحفظ.", "err"); }
+};
+
+// ---------- سجل العمليات ----------
+let logLast = null;
+async function loadLog(reset) {
+  if (reset) { logLast = null; $("logRows").textContent = ""; }
+  try {
+    const parts = [orderBy("at", "desc")];
+    if (logLast) parts.push(startAfter(logLast));
+    parts.push(limit(PAGE));
+    const snap = await getDocs(query(collection(db, "adminLog"), ...parts));
+    snap.forEach(x => {
+      const d = x.data(), tr = $("logRows").insertRow();
+      tr.insertCell().textContent = fmt(d.at);
+      tr.insertCell().textContent = d.action;
+      tr.insertCell().textContent = d.memberNo ? pad(d.memberNo) : "";
+      tr.insertCell().textContent = d.details;
+    });
+    if (snap.size) logLast = snap.docs[snap.docs.length - 1];
+    $("logNext").disabled = snap.size < PAGE;
+  } catch { say("تعذّر تحميل السجل.", "err"); }
+}
+$("logNext").onclick = () => loadLog(false);
+</script>
+</body>
+</html>

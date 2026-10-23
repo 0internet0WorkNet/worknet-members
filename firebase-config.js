@@ -9,3 +9,6 @@ export const firebaseConfig = {
 
 // بريد حساب الإدارة (يجب أن يطابق البريد داخل firestore.rules)
 export const ADMIN_EMAIL = "qvnlxfjc@gmail.com";
+
+// رابط صفحة سياسة الخصوصية في المدونة
+export const PRIVACY_URL = "https://worknet111.blogspot.com/p/blog-page_24.html";
