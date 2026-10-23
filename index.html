@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>حسابي والمكافآت</title>
+<style>
+  :root { --bg:#f5f6fa; --card:#fff; --ink:#1d2433; --accent:#2f6fed; --muted:#6b7385; --ok:#1a8f4c; --err:#c0392b; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,"Segoe UI",Tahoma,sans-serif; background:var(--bg); color:var(--ink); }
+  main { max-width:420px; margin:0 auto; padding:20px 16px 40px; }
+  .card { background:var(--card); border-radius:14px; padding:20px; box-shadow:0 1px 6px rgba(0,0,0,.08); margin-top:16px; }
+  input[type=text],input[type=email],input[type=password] { width:100%; padding:12px; margin:6px 0; border:1px solid #cfd5e2; border-radius:10px; font-size:1rem; }
+  button { width:100%; padding:12px; margin-top:8px; border:0; border-radius:10px; background:var(--accent); color:#fff; font-size:1rem; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--accent); border:1px solid var(--accent); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .points { font-size:2.6rem; font-weight:700; text-align:center; margin:6px 0; }
+  .muted { color:var(--muted); text-align:center; font-size:.9rem; }
+  .badge { display:inline-block; padding:2px 10px; border-radius:8px; background:#e8f0ff; color:var(--accent); font-weight:600; font-size:.95rem; }
+  .center { text-align:center; }
+  .notice { background:#fff4e5; color:#8a5a00; border-radius:10px; padding:10px; margin-top:10px; font-size:.9rem; text-align:center; }
+  .msg { text-align:center; margin-top:10px; min-height:1.2em; font-size:.95rem; }
+  .msg.err { color:var(--err); } .msg.ok { color:var(--ok); }
+  .hidden { display:none; }
+  .terms { display:flex; gap:8px; align-items:flex-start; font-size:.92rem; margin:10px 0; line-height:1.7; }
+  .terms input { margin-top:5px; }
+  a { color:var(--accent); }
+  table { width:100%; border-collapse:collapse; font-size:.9rem; }
+  td { padding:6px 4px; border-bottom:1px solid #eef0f5; }
+</style>
+</head>
+<body>
+<script>
+(function () {
+  var BLOG = "https://worknet111.blogspot.com/p/my-account-and-rewards.html";
+  var inFrame = true;
+  try { inFrame = window.self !== window.top; } catch (e) {}
+  if (!inFrame) { window.__wnBlock = true; location.replace(BLOG); return; }
+  var src = (location.ancestorOrigins && location.ancestorOrigins[0]) || document.referrer || "";
+  if (src) {
+    var host = "";
+    try { host = new URL(src).hostname; } catch (e) {}
+    if (host && !/^worknet111\.blogspot\./.test(host)) {
+      window.__wnBlock = true;
+      document.write('<p style="text-align:center;font-family:sans-serif;margin:40px 16px">هذه الصفحة تعمل داخل موقع Work Net فقط.<br><a href="' + BLOG + '" target="_top">افتح صفحة الحساب</a></p>');
+    }
+  }
+})();
+</script>
+<main>
+  <h1 style="font-size:1.3rem;margin:8px 0 0;text-align:center">حسابي والمكافآت</h1>
+
+  <!-- تسجيل الدخول / التسجيل -->
+  <section id="authBox" class="card">
+    <input id="name" type="text" placeholder="الاسم (عند التسجيل فقط)" maxlength="40">
+    <input id="email" type="email" placeholder="البريد الإلكتروني" autocomplete="email">
+    <input id="password" type="password" placeholder="كلمة المرور (6 أحرف على الأقل)" autocomplete="current-password">
+    <button id="loginBtn">دخول</button>
+    <button id="signupBtn" class="ghost">إنشاء حساب جديد</button>
+    <button id="resetBtn" class="ghost">نسيت كلمة المرور</button>
+  </section>
+
+  <!-- بانتظار تأكيد البريد -->
+  <section id="verifyBox" class="card hidden">
+    <p class="muted">أرسلنا رسالة تأكيد إلى بريدك. افتح الرابط الذي فيها ثم اضغط الزر.</p>
+    <button id="checkVerifyBtn">لقد أكدت بريدي</button>
+    <button id="resendBtn" class="ghost">إعادة إرسال الرسالة</button>
+    <button id="logoutBtn1" class="ghost">خروج</button>
+  </section>
+
+  <!-- الموافقة على الشروط وإنشاء الملف -->
+  <section id="termsBox" class="card hidden">
+    <p class="center" style="margin-top:0">خطوة أخيرة لإنشاء حسابك</p>
+    <label class="terms">
+      <input id="termsCheck" type="checkbox">
+      <span>أوافق على الشروط و<a id="privacyLink" href="#" target="_blank" rel="noopener">سياسة الخصوصية</a></span>
+    </label>
+    <button id="createProfileBtn" disabled>إنشاء حسابي</button>
+    <button id="logoutBtn3" class="ghost">خروج</button>
+  </section>
+
+  <!-- صفحة العضو -->
+  <section id="memberBox" class="card hidden">
+    <div class="center"><span class="badge" id="memberNo"></span></div>
+    <div class="muted" id="who" style="margin-top:6px"></div>
+    <div class="points" id="points">0</div>
+    <div class="muted">رصيد النقاط</div>
+    <div id="stoppedNote" class="notice hidden">حسابك متوقف حاليًا.</div>
+    <div id="rewardsOffNote" class="notice hidden">المكافآت متوقفة مؤقتًا.</div>
+    <button id="claimBtn">استلم مكافأتك اليومية</button>
+    <div class="muted" id="countdown"></div>
+    <h3 style="margin-bottom:4px">آخر العمليات</h3>
+    <table id="log"></table>
+    <button id="logoutBtn2" class="ghost">خروج</button>
+  </section>
+
+  <div id="msg" class="msg"></div>
+</main>
+
+<script type="module">
+import { firebaseConfig, PRIVACY_URL } from "./firebase-config.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+         sendEmailVerification, sendPasswordResetEmail, signOut, updateProfile }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, doc, getDoc, updateDoc, writeBatch, collection, serverTimestamp,
+         Timestamp, increment, onSnapshot, query, orderBy, limit, runTransaction }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+if (window.__wnBlock) throw new Error("outside-site");
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const $ = id => document.getElementById(id);
+const DAY = 24 * 60 * 60 * 1000;
+$("privacyLink").href = PRIVACY_URL;
+
+// معرّف هذا الجهاز (لجلسة واحدة لكل عضو)
+let SID = "";
+try { SID = localStorage.getItem("wn_sid") || ""; } catch {}
+if (!SID) {
+  SID = Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
+  try { localStorage.setItem("wn_sid", SID); } catch {}
+}
+
+let unsubUser = null, unsubLog = null, unsubCfg = null, timer = null;
+let lastClaimMs = 0, userActive = true, rewardsOpen = true, sessionReady = false;
+
+function say(text, kind) { const m = $("msg"); m.textContent = text || ""; m.className = "msg " + (kind || ""); }
+function show(which) {
+  for (const id of ["authBox","verifyBox","termsBox","memberBox"]) $(id).classList.toggle("hidden", id !== which);
+}
+function errText(e) {
+  const c = e && e.code || "";
+  if (c.includes("invalid-credential") || c.includes("wrong-password") || c.includes("user-not-found")) return "البريد أو كلمة المرور غير صحيحة.";
+  if (c.includes("email-already-in-use")) return "هذا البريد مسجّل من قبل.";
+  if (c.includes("weak-password")) return "كلمة المرور ضعيفة (6 أحرف على الأقل).";
+  if (c.includes("invalid-email")) return "البريد الإلكتروني غير صالح.";
+  if (c.includes("too-many-requests")) return "محاولات كثيرة، انتظر قليلًا ثم أعد المحاولة.";
+  if (c.includes("permission-denied")) return "غير مسموح بهذه العملية الآن.";
+  return "حدث خطأ، أعد المحاولة.";
+}
+const utcDayKey = () => { const d = new Date(); return `${d.getUTCFullYear()}-${d.getUTCMonth() + 1}-${d.getUTCDate()}`; };
+const pad = n => "#" + String(n).padStart(4, "0");
+
+$("signupBtn").onclick = async () => {
+  say("");
+  const nm = $("name").value.trim().slice(0, 40);
+  if (!nm) return say("اكتب اسمك أولًا.", "err");
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, $("email").value.trim(), $("password").value);
+    await updateProfile(cred.user, { displayName: nm });
+    await sendEmailVerification(cred.user);
+    say("تم إنشاء الحساب. تحقق من بريدك.", "ok");
+  } catch (e) { say(errText(e), "err"); }
+};
+$("loginBtn").onclick = async () => {
+  say("");
+  try { await signInWithEmailAndPassword(auth, $("email").value.trim(), $("password").value); }
+  catch (e) { say(errText(e), "err"); }
+};
+$("resetBtn").onclick = async () => {
+  const em = $("email").value.trim();
+  if (!em) return say("اكتب بريدك أولًا.", "err");
+  try { await sendPasswordResetEmail(auth, em); say("أرسلنا رابط استعادة كلمة المرور.", "ok"); }
+  catch (e) { say(errText(e), "err"); }
+};
+$("resendBtn").onclick = async () => {
+  try { await sendEmailVerification(auth.currentUser); say("أعدنا إرسال الرسالة.", "ok"); }
+  catch (e) { say(errText(e), "err"); }
+};
+$("checkVerifyBtn").onclick = async () => {
+  await auth.currentUser.reload();
+  await auth.currentUser.getIdToken(true);
+  location.reload();
+};
+for (const id of ["logoutBtn1","logoutBtn2","logoutBtn3"]) $(id).onclick = () => signOut(auth);
+$("termsCheck").onchange = () => { $("createProfileBtn").disabled = !$("termsCheck").checked; };
+
+function stopListeners() {
+  if (unsubUser) unsubUser(); if (unsubLog) unsubLog(); if (unsubCfg) unsubCfg();
+  unsubUser = unsubLog = unsubCfg = null; clearInterval(timer);
+}
+
+onAuthStateChanged(auth, async user => {
+  stopListeners(); sessionReady = false;
+  if (!user) { say(""); return show("authBox"); }
+  if (!user.emailVerified) return show("verifyBox");
+
+  const uref = doc(db, "users", user.uid);
+  let snap;
+  try { snap = await getDoc(uref); }
+  catch (e) { return say(errText(e), "err"); }
+
+  if (!snap.exists()) { show("termsBox"); return; }
+  openMember(user, uref, snap.data());
+});
+
+// إنشاء الملف الشخصي (مع رقم العضوية والحد اليومي)
+$("createProfileBtn").onclick = async () => {
+  say("");
+  const user = auth.currentUser;
+  const uref = doc(db, "users", user.uid);
+  const name = (user.displayName || user.email.split("@")[0]).trim().slice(0, 40);
+  const memberRef = doc(db, "counters", "members");
+  const signRef = doc(db, "counters", "signups_" + utcDayKey());
+  $("createProfileBtn").disabled = true;
+  try {
+    await runTransaction(db, async tx => {
+      const cfg = await tx.get(doc(db, "config", "app"));
+      if (!cfg.exists() || cfg.data().registrationOpen !== true) throw new Error("closed");
+      const cnt = await tx.get(memberRef);
+      if (!cnt.exists()) throw new Error("notready");
+      const sg = await tx.get(signRef);
+      const count = sg.exists() ? sg.data().count : 0;
+      const cap = cfg.data().dailyCap || 0;
+      if (cap > 0 && count + 1 > cap) throw new Error("cap");
+      const next = cnt.data().next;
+      tx.set(uref, {
+        name, nameLower: name.toLowerCase(), email: user.email, points: 0, status: "active",
+        lastClaim: Timestamp.fromMillis(0), createdAt: serverTimestamp(),
+        memberNo: next, termsAccepted: true, sessionId: SID,
+      });
+      tx.update(memberRef, { next: next + 1 });
+      tx.set(signRef, { count: count + 1 });
+    });
+    location.reload();
+  } catch (e) {
+    $("createProfileBtn").disabled = !$("termsCheck").checked;
+    const m = String(e && e.message || "");
+    if (m.includes("closed")) say("التسجيل مغلق حاليًا.", "err");
+    else if (m.includes("cap")) say("التسجيل مغلق اليوم، حاول غدًا.", "err");
+    else if (m.includes("notready")) say("النظام غير جاهز بعد، حاول لاحقًا.", "err");
+    else say(errText(e), "err");
+  }
+};
+
+// ترقيم الحساب القديم الذي ليس له رقم
+async function ensureNumber(uref) {
+  try {
+    await runTransaction(db, async tx => {
+      const u = await tx.get(uref);
+      if (u.data().memberNo) return;
+      const memberRef = doc(db, "counters", "members");
+      const cnt = await tx.get(memberRef);
+      if (!cnt.exists()) return;
+      const next = cnt.data().next;
+      tx.update(uref, { memberNo: next, nameLower: String(u.data().name || "").toLowerCase() });
+      tx.update(memberRef, { next: next + 1 });
+    });
+  } catch {}
+}
+
+function openMember(user, uref, data) {
+  show("memberBox");
+  if (!data.memberNo) ensureNumber(uref);
+
+  unsubCfg = onSnapshot(doc(db, "config", "app"), s => {
+    rewardsOpen = !s.exists() || s.data().rewardsOpen !== false;
+    $("rewardsOffNote").classList.toggle("hidden", rewardsOpen);
+    tick();
+  }, () => {});
+
+  unsubUser = onSnapshot(uref, s => {
+    const d = s.data(); if (!d) return;
+    // جلسة واحدة: أول لقطة تسجّل جهازنا، وأي جهاز آخر لاحقًا يُخرجنا
+    if (!sessionReady) {
+      sessionReady = true;
+      if (d.sessionId !== SID) updateDoc(uref, { sessionId: SID }).catch(() => {});
+    } else if (d.sessionId && d.sessionId !== SID) {
+      say("تم تسجيل دخولك من جهاز آخر، فأُغلقت هذه الجلسة.", "err");
+      signOut(auth);
+      return;
+    }
+    $("memberNo").textContent = d.memberNo ? pad(d.memberNo) : "—";
+    $("who").textContent = d.name;
+    $("points").textContent = d.points;
+    lastClaimMs = d.lastClaim.toMillis();
+    userActive = d.status === "active";
+    $("stoppedNote").classList.toggle("hidden", userActive);
+    tick();
+  });
+
+  unsubLog = onSnapshot(query(collection(uref, "log"), orderBy("at", "desc"), limit(8)), s => {
+    const t = $("log"); t.textContent = "";
+    s.forEach(x => {
+      const d = x.data(), tr = t.insertRow();
+      tr.insertCell().textContent = d.at ? d.at.toDate().toLocaleString("ar") : "";
+      tr.insertCell().textContent = (d.delta > 0 ? "+" : "") + d.delta;
+      tr.insertCell().textContent = d.reason === "daily" ? "مكافأة يومية" : "تعديل من الإدارة";
+    });
+  });
+  timer = setInterval(tick, 1000);
+}
+
+function tick() {
+  const b = $("claimBtn");
+  if (!userActive) { b.disabled = true; $("countdown").textContent = ""; return; }
+  if (!rewardsOpen) { b.disabled = true; $("countdown").textContent = ""; return; }
+  const left = lastClaimMs + DAY - Date.now();
+  if (left > 0) {
+    b.disabled = true;
+    const h = Math.floor(left / 3600000), m = Math.floor(left % 3600000 / 60000), s = Math.floor(left % 60000 / 1000);
+    $("countdown").textContent = `المكافأة التالية بعد ${h}س ${m}د ${s}ث`;
+  } else { b.disabled = false; $("countdown").textContent = ""; }
+}
+
+$("claimBtn").onclick = async () => {
+  say("");
+  const user = auth.currentUser;
+  try {
+    const cfgSnap = await getDoc(doc(db, "config", "daily"));
+    if (!cfgSnap.exists() || !cfgSnap.data().enabled) return say("المكافأة اليومية متوقفة حاليًا.", "err");
+    const pts = cfgSnap.data().points;
+    const uref = doc(db, "users", user.uid);
+    const batch = writeBatch(db);
+    batch.update(uref, { points: increment(pts), lastClaim: serverTimestamp() });
+    batch.set(doc(collection(uref, "log")), { delta: pts, reason: "daily", at: serverTimestamp() });
+    await batch.commit();
+    say(`تمت إضافة ${pts} نقطة إلى رصيدك.`, "ok");
+  } catch (e) { say("لا يمكن الاستلام الآن. ربما لم تمر 24 ساعة بعد.", "err"); }
+};
+</script>
+</body>
+</html>
