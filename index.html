@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>حسابي والمكافآت</title>
+<style>
+  :root { --bg:#f5f6fa; --card:#fff; --ink:#1d2433; --accent:#2f6fed; --muted:#6b7385; --ok:#1a8f4c; --err:#c0392b; --line:#eef0f5; --field:#cfd5e2; --note:#fff4e5; --noteInk:#8a5a00; }
+  :root[data-theme=dark] { --bg:#12151c; --card:#1c212c; --ink:#e8ebf3; --accent:#6a9bff; --muted:#9aa3b8; --ok:#4cc88a; --err:#ff7b6b; --line:#2b3140; --field:#3a4256; --note:#3a2f14; --noteInk:#f0c36a; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,"Segoe UI",Tahoma,sans-serif; background:var(--bg); color:var(--ink); }
+  main { max-width:440px; margin:0 auto; padding:12px 14px 80px; }
+  .card { background:var(--card); border-radius:14px; padding:16px; box-shadow:0 1px 6px rgba(0,0,0,.08); margin-top:12px; }
+  input[type=text],input[type=email],input[type=password],input[type=tel],textarea,select { width:100%; padding:11px; margin:5px 0; border:1px solid var(--field); border-radius:10px; font-size:1rem; background:var(--card); color:var(--ink); font-family:inherit; }
+  button { width:100%; padding:11px; margin-top:8px; border:0; border-radius:10px; background:var(--accent); color:#fff; font-size:1rem; cursor:pointer; font-family:inherit; }
+  button.ghost { background:transparent; color:var(--accent); border:1px solid var(--accent); }
+  button.danger { background:var(--err); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .points { font-size:2.6rem; font-weight:700; text-align:center; margin:4px 0; }
+  .muted { color:var(--muted); text-align:center; font-size:.9rem; }
+  .small { font-size:.85rem; color:var(--muted); }
+  .badge { display:inline-block; padding:2px 10px; border-radius:8px; background:rgba(47,111,237,.14); color:var(--accent); font-weight:600; font-size:.95rem; }
+  .center { text-align:center; }
+  .notice { background:var(--note); color:var(--noteInk); border-radius:10px; padding:10px; margin-top:10px; font-size:.9rem; text-align:center; }
+  .msg { text-align:center; margin-top:10px; min-height:1.2em; font-size:.95rem; }
+  .msg.err { color:var(--err); } .msg.ok { color:var(--ok); }
+  .hidden { display:none !important; }
+  .terms { display:flex; gap:8px; align-items:flex-start; font-size:.92rem; margin:10px 0; line-height:1.7; }
+  .terms input { margin-top:5px; }
+  a { color:var(--accent); }
+  table { width:100%; border-collapse:collapse; font-size:.9rem; }
+  td { padding:6px 4px; border-bottom:1px solid var(--line); }
+  h3 { margin:6px 0; font-size:1.05rem; }
+  .top { display:flex; align-items:center; gap:8px; }
+  .top h1 { flex:1; font-size:1.15rem; margin:0; text-align:center; }
+  .icon { width:42px; margin:0; padding:8px; background:var(--card); color:var(--ink); border:1px solid var(--line); position:relative; font-size:1.1rem; }
+  .dot { position:absolute; top:-5px; left:-5px; background:var(--err); color:#fff; border-radius:10px; font-size:.7rem; min-width:18px; padding:1px 4px; }
+  .bar { background:var(--accent); color:#fff; border-radius:10px; padding:9px; margin-top:10px; text-align:center; font-size:.92rem; }
+  .bar a { color:#fff; }
+  .tabs { position:fixed; bottom:0; right:0; left:0; background:var(--card); border-top:1px solid var(--line); display:flex; max-width:440px; margin:0 auto; }
+  .tabs button { flex:1; margin:0; border-radius:0; background:transparent; color:var(--muted); padding:12px 4px; font-size:.9rem; }
+  .tabs button.on { color:var(--accent); font-weight:700; }
+  .item { border-bottom:1px solid var(--line); padding:9px 0; }
+  .bubble { padding:8px 10px; border-radius:10px; margin:6px 0; font-size:.92rem; max-width:88%; }
+  .bubble.me { background:rgba(47,111,237,.14); }
+  .bubble.ad { background:var(--note); color:var(--noteInk); margin-right:auto; }
+  .prog { height:8px; background:var(--line); border-radius:6px; overflow:hidden; margin-top:6px; }
+  .prog i { display:block; height:100%; background:var(--ok); }
+  .row2 { display:flex; gap:8px; } .row2 > * { flex:1; }
+  .tag { display:inline-block; padding:1px 8px; border-radius:8px; font-size:.8rem; background:var(--line); }
+  .tag.ok { color:var(--ok); } .tag.err { color:var(--err); }
+</style>
+</head>
+<body>
+<script>
+(function () {
+  var BLOG = "https://worknet111.blogspot.com/p/my-account-and-rewards.html";
+  try { var t = localStorage.getItem("wn_theme"); if (t) document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+  var inFrame = true;
+  try { inFrame = window.self !== window.top; } catch (e) {}
+  if (!inFrame) { window.__wnBlock = true; location.replace(BLOG); return; }
+  var src = (location.ancestorOrigins && location.ancestorOrigins[0]) || document.referrer || "";
+  if (src) {
+    var host = "";
+    try { host = new URL(src).hostname; } catch (e) {}
+    if (host && !/^worknet111\.blogspot\./.test(host)) {
+      window.__wnBlock = true;
+      document.write('<p style="text-align:center;font-family:sans-serif;margin:40px 16px">هذه الصفحة تعمل داخل موقع Work Net فقط.<br><a href="' + BLOG + '" target="_top">افتح صفحة الحساب</a></p>');
+    }
+  }
+  // رابط الإحالة: ?ref=رقم_العضو
+  try {
+    var m = /[?&]ref=(\d{1,7})/.exec(location.search);
+    if (m) localStorage.setItem("wn_ref", m[1]);
+  } catch (e) {}
+})();
+</script>
+<main>
+  <!-- تسجيل الدخول / التسجيل -->
+  <h1 id="plainTitle" style="font-size:1.25rem;margin:8px 0 0;text-align:center">حسابي والمكافآت</h1>
+  <section id="authBox" class="card">
+    <input id="name" type="text" placeholder="الاسم (عند التسجيل فقط)" maxlength="40">
+    <input id="email" type="email" placeholder="البريد الإلكتروني" autocomplete="email">
+    <input id="password" type="password" placeholder="كلمة المرور (6 أحرف على الأقل)" autocomplete="current-password">
+    <button id="loginBtn">دخول</button>
+    <button id="signupBtn" class="ghost">إنشاء حساب جديد</button>
+    <button id="resetBtn" class="ghost">نسيت كلمة المرور</button>
+  </section>
+
+  <section id="verifyBox" class="card hidden">
+    <p class="muted">أرسلنا رسالة تأكيد إلى بريدك. افتح الرابط الذي فيها ثم اضغط الزر.</p>
+    <button id="checkVerifyBtn">لقد أكدت بريدي</button>
+    <button id="resendBtn" class="ghost">إعادة إرسال الرسالة</button>
+    <button id="logoutBtn1" class="ghost">خروج</button>
+  </section>
+
+  <section id="termsBox" class="card hidden">
+    <p class="center" style="margin-top:0">خطوة أخيرة لإنشاء حسابك</p>
+    <label class="terms">
+      <input id="termsCheck" type="checkbox">
+      <span>أوافق على الشروط و<a id="privacyLink" href="#" target="_blank" rel="noopener">سياسة الخصوصية</a></span>
+    </label>
+    <button id="createProfileBtn" disabled>إنشاء حسابي</button>
+    <button id="logoutBtn3" class="ghost">خروج</button>
+  </section>
+
+  <section id="offBox" class="card hidden"><p class="notice">الخدمة متوقفة مؤقتًا للصيانة. عُد لاحقًا.</p><button id="logoutBtn4" class="ghost">خروج</button></section>
+
+  <!-- التطبيق -->
+  <div id="appBox" class="hidden">
+    <div class="top">
+      <button class="icon" id="bellBtn" aria-label="الإشعارات">🔔<span id="bellDot" class="dot hidden">0</span></button>
+      <h1>حسابي والمكافآت</h1>
+      <button class="icon" id="setBtn" aria-label="الإعدادات">⚙️</button>
+    </div>
+    <div id="announce" class="bar hidden"></div>
+    <div id="stoppedNote" class="notice hidden">حسابك متوقف حاليًا.</div>
+
+    <!-- الإشعارات -->
+    <section id="bellPanel" class="card hidden"><h3>الإشعارات</h3><div id="bellList"></div><button id="bellClose" class="ghost">إغلاق</button></section>
+
+    <!-- الإعدادات -->
+    <section id="setPanel" class="card hidden">
+      <h3>الإعدادات</h3>
+      <div class="small" id="setInfo"></div>
+      <label class="small">رقم الهاتف (اختياري)</label>
+      <input id="phone" type="tel" maxlength="30" placeholder="رقم الهاتف">
+      <label class="small">رابط حسابك في فيسبوك (اختياري)</label>
+      <input id="fb" type="text" maxlength="200" placeholder="https://facebook.com/...">
+      <button id="saveProfile">حفظ</button>
+      <label class="small" style="display:block;margin-top:12px">رابط الإحالة الخاص بك</label>
+      <input id="refLink" type="text" readonly>
+      <button id="copyRef" class="ghost">نسخ الرابط</button>
+      <div class="row2"><button id="themeBtn" class="ghost">المظهر: فاتح/داكن</button><button id="pwBtn" class="ghost">تغيير كلمة المرور</button></div>
+      <a id="privacyLink2" href="#" target="_blank" rel="noopener" style="display:block;text-align:center;margin-top:10px">سياسة الخصوصية</a>
+      <button id="delBtn" class="danger">حذف حسابي</button>
+      <button id="logoutBtn2" class="ghost">تسجيل الخروج</button>
+      <button id="setClose" class="ghost">إغلاق</button>
+    </section>
+
+    <!-- الرئيسية -->
+    <section id="tab_home">
+      <div class="card">
+        <div class="center"><span class="badge" id="memberNo"></span></div>
+        <div class="muted" id="who" style="margin-top:6px"></div>
+        <div class="points" id="points">0</div>
+        <div class="muted">رصيد النقاط</div>
+        <div id="rewardsOffNote" class="notice hidden">المكافآت متوقفة مؤقتًا.</div>
+        <button id="claimBtn">استلم مكافأتك اليومية</button>
+        <div class="muted" id="countdown"></div>
+        <div id="streakBox" class="hidden"><div class="small center" id="streakTxt"></div><div class="prog"><i id="streakBar" style="width:0"></i></div></div>
+      </div>
+
+      <div id="codeCard" class="card hidden">
+        <h3>🎁 كود الجوائز</h3>
+        <input id="codeIn" type="text" placeholder="اكتب الكود" autocomplete="off" style="text-transform:uppercase">
+        <button id="codeBtn">تفعيل الكود</button>
+      </div>
+
+      <div id="qCard" class="card hidden">
+        <h3>❓ سؤال اليوم</h3>
+        <div class="small" id="qArt"></div>
+        <p id="qText" style="margin:8px 0"></p>
+        <div class="small" id="qHint"></div>
+        <div id="qForm">
+          <input id="qIn" type="text" placeholder="إجابتك" autocomplete="off">
+          <button id="qBtn">إرسال الإجابة</button>
+          <div class="small center" id="qInfo"></div>
+        </div>
+        <div id="qDone" class="notice hidden">أجبت إجابة صحيحة اليوم 🎉</div>
+      </div>
+
+      <div class="card"><h3>آخر العمليات</h3><table id="log"></table></div>
+    </section>
+
+    <!-- المهام -->
+    <section id="tab_tasks" class="hidden"><div class="card"><h3>المهام</h3><div id="taskList" class="muted">...</div></div></section>
+
+    <!-- الرسائل -->
+    <section id="tab_msgs" class="hidden">
+      <div class="card">
+        <h3>رسالة إلى الإدارة</h3>
+        <select id="msgSel"></select>
+        <input id="msgVal" type="text" maxlength="100" class="hidden">
+        <button id="msgSend">إرسال</button>
+        <div class="small center">اختر رسالة جاهزة من القائمة.</div>
+      </div>
+      <div class="card"><h3>المحادثة</h3><div id="chat" class="muted">...</div></div>
+    </section>
+
+    <!-- الترتيب -->
+    <section id="tab_rank" class="hidden"><div class="card"><h3>ترتيب الأعضاء بالنقاط</h3><div id="rankList" class="muted">...</div></div></section>
+
+    <nav class="tabs" id="tabs">
+      <button data-t="home" class="on">الرئيسية</button>
+      <button data-t="tasks">المهام</button>
+      <button data-t="msgs">الرسائل</button>
+      <button data-t="rank" id="rankTab">الترتيب</button>
+    </nav>
+  </div>
+
+  <div id="msg" class="msg"></div>
+</main>
+
+<script type="module">
+import { firebaseConfig, PRIVACY_URL } from "./firebase-config.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+         sendEmailVerification, sendPasswordResetEmail, signOut, updateProfile }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, writeBatch, collection, serverTimestamp,
+         Timestamp, increment, onSnapshot, query, orderBy, where, limit, runTransaction }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+if (window.__wnBlock) throw new Error("outside-site");
+
+const BLOG = "https://worknet111.blogspot.com/p/my-account-and-rewards.html";
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const $ = id => document.getElementById(id);
+const HOUR = 3600000;
+$("privacyLink").href = PRIVACY_URL; $("privacyLink2").href = PRIVACY_URL;
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const norm = s => String(s || "").normalize("NFKC").toLowerCase().replace(/[ً-ٰٟـ]/g, "")
+  .replace(/[أإآ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").replace(/\s+/g, " ").trim();
+const pad = n => "#" + String(n).padStart(4, "0");
+const utcDayKey = () => { const d = new Date(); return `${d.getUTCFullYear()}-${d.getUTCMonth() + 1}-${d.getUTCDate()}`; };
+const localKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+const fdate = t => t && t.toDate ? t.toDate().toLocaleString("ar") : "";
+
+let SID = "";
+try { SID = localStorage.getItem("wn_sid") || ""; } catch {}
+if (!SID) { SID = Math.random().toString(36).slice(2, 12) + Date.now().toString(36); try { localStorage.setItem("wn_sid", SID); } catch {} }
+
+let uid = "", uref = null, U = {}, CFG = {}, DAILY = {}, PUB = {}, TEXTS = null;
+let unsubUser = null, timer = null, sessionReady = false, loaded = {};
+let QKEY = "", Q = null, qTries = 0;
+
+function say(text, kind) { const m = $("msg"); m.textContent = text || ""; m.className = "msg " + (kind || ""); }
+function show(which) {
+  for (const id of ["authBox","verifyBox","termsBox","offBox","appBox"]) $(id).classList.toggle("hidden", id !== which);
+  $("plainTitle").classList.toggle("hidden", which === "appBox");
+}
+function errText(e) {
+  const c = e && e.code || "";
+  if (c.includes("invalid-credential") || c.includes("wrong-password") || c.includes("user-not-found")) return "البريد أو كلمة المرور غير صحيحة.";
+  if (c.includes("email-already-in-use")) return "هذا البريد مسجّل من قبل.";
+  if (c.includes("weak-password")) return "كلمة المرور ضعيفة (6 أحرف على الأقل).";
+  if (c.includes("invalid-email")) return "البريد الإلكتروني غير صالح.";
+  if (c.includes("too-many-requests")) return "محاولات كثيرة، انتظر قليلًا ثم أعد المحاولة.";
+  if (c.includes("permission-denied")) return "غير مسموح بهذه العملية الآن.";
+  return "حدث خطأ، أعد المحاولة.";
+}
+
+// ---------- الدخول والتسجيل ----------
+$("signupBtn").onclick = async () => {
+  say("");
+  const nm = $("name").value.trim().slice(0, 40);
+  if (!nm) return say("اكتب اسمك أولًا.", "err");
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, $("email").value.trim(), $("password").value);
+    await updateProfile(cred.user, { displayName: nm });
+    await sendEmailVerification(cred.user);
+    say("تم إنشاء الحساب. تحقق من بريدك.", "ok");
+  } catch (e) { say(errText(e), "err"); }
+};
+$("loginBtn").onclick = async () => {
+  say("");
+  try { await signInWithEmailAndPassword(auth, $("email").value.trim(), $("password").value); }
+  catch (e) { say(errText(e), "err"); }
+};
+$("resetBtn").onclick = async () => {
+  const em = $("email").value.trim();
+  if (!em) return say("اكتب بريدك أولًا.", "err");
+  try { await sendPasswordResetEmail(auth, em); say("أرسلنا رابط استعادة كلمة المرور.", "ok"); }
+  catch (e) { say(errText(e), "err"); }
+};
+$("resendBtn").onclick = async () => {
+  try { await sendEmailVerification(auth.currentUser); say("أعدنا إرسال الرسالة.", "ok"); }
+  catch (e) { say(errText(e), "err"); }
+};
+$("checkVerifyBtn").onclick = async () => {
+  await auth.currentUser.reload();
+  await auth.currentUser.getIdToken(true);
+  location.reload();
+};
+for (const id of ["logoutBtn1","logoutBtn2","logoutBtn3","logoutBtn4"]) $(id).onclick = () => signOut(auth);
+$("termsCheck").onchange = () => { $("createProfileBtn").disabled = !$("termsCheck").checked; };
+
+function stopListeners() {
+  if (unsubUser) unsubUser();
+  unsubUser = null; clearInterval(timer);
+}
+
+onAuthStateChanged(auth, async user => {
+  stopListeners(); sessionReady = false; loaded = {};
+  if (!user) { say(""); return show("authBox"); }
+  if (!user.emailVerified) return show("verifyBox");
+  uid = user.uid; uref = doc(db, "users", uid);
+  let snap;
+  try { snap = await getDoc(uref); }
+  catch (e) { return say(errText(e), "err"); }
+  if (!snap.exists()) { show("termsBox"); return; }
+  openApp(snap.data());
+});
+
+// ---------- إنشاء الحساب ----------
+$("createProfileBtn").onclick = async () => {
+  say("");
+  const user = auth.currentUser;
+  const name = (user.displayName || user.email.split("@")[0]).trim().slice(0, 40);
+  const memberRef = doc(db, "counters", "members");
+  const signRef = doc(db, "counters", "signups_" + utcDayKey());
+  let ref = 0; try { ref = parseInt(localStorage.getItem("wn_ref") || "0", 10) || 0; } catch {}
+  $("createProfileBtn").disabled = true;
+  try {
+    await runTransaction(db, async tx => {
+      const cfg = await tx.get(doc(db, "config", "app"));
+      if (!cfg.exists() || cfg.data().registrationOpen !== true) throw new Error("closed");
+      const cnt = await tx.get(memberRef);
+      if (!cnt.exists()) throw new Error("notready");
+      const sg = await tx.get(signRef);
+      const count = sg.exists() ? sg.data().count : 0;
+      const cap = cfg.data().dailyCap || 0;
+      if (cap > 0 && count + 1 > cap) throw new Error("cap");
+      const next = cnt.data().next;
+      const bonus = Math.max(0, Math.floor(cfg.data().welcomeBonus || 0));
+      const data = {
+        name, nameLower: name.toLowerCase(), email: user.email, points: bonus, status: "active",
+        lastClaim: Timestamp.fromMillis(0), createdAt: serverTimestamp(),
+        memberNo: next, termsAccepted: true, sessionId: SID,
+      };
+      const hasRef = ref > 0 && ref < next;
+      if (hasRef) data.refBy = ref;
+      tx.set(uref, data);
+      tx.update(memberRef, { next: next + 1 });
+      tx.set(signRef, { count: count + 1 });
+      if (bonus > 0) tx.set(doc(collection(uref, "log")), { delta: bonus, reason: "welcome", at: serverTimestamp() });
+      if (hasRef) tx.set(doc(db, "referrals", uid), { refNo: ref, newNo: next, status: "pending", at: serverTimestamp() });
+    });
+    location.reload();
+  } catch (e) {
+    $("createProfileBtn").disabled = !$("termsCheck").checked;
+    const m = String(e && e.message || "");
+    if (m.includes("closed")) say("التسجيل مغلق حاليًا.", "err");
+    else if (m.includes("cap")) say("التسجيل مغلق اليوم، حاول غدًا.", "err");
+    else if (m.includes("notready")) say("النظام غير جاهز بعد، حاول لاحقًا.", "err");
+    else say(errText(e), "err");
+  }
+};
+
+async function ensureNumber() {
+  try {
+    await runTransaction(db, async tx => {
+      const u = await tx.get(uref);
+      if (u.data().memberNo) return;
+      const memberRef = doc(db, "counters", "members");
+      const cnt = await tx.get(memberRef);
+      if (!cnt.exists()) return;
+      const next = cnt.data().next;
+      tx.update(uref, { memberNo: next, nameLower: String(u.data().name || "").toLowerCase() });
+      tx.update(memberRef, { next: next + 1 });
+    });
+  } catch {}
+}
+
+// ---------- التطبيق ----------
+async function openApp(first) {
+  if (!first.memberNo) ensureNumber();
+  try {
+    const [a, d, p] = await Promise.all([getDoc(doc(db, "config", "app")), getDoc(doc(db, "config", "daily")), getDoc(doc(db, "config", "public"))]);
+    CFG = a.exists() ? a.data() : {}; DAILY = d.exists() ? d.data() : {}; PUB = p.exists() ? p.data() : {};
+  } catch {}
+  if (CFG.appOpen === false) return show("offBox");
+  show("appBox");
+  $("rewardsOffNote").classList.toggle("hidden", CFG.rewardsOpen !== false);
+  $("rankTab").classList.toggle("hidden", CFG.showRanking !== true);
+  if (PUB.announce && PUB.announce.on && PUB.announce.text) {
+    const b = $("announce"); b.classList.remove("hidden");
+    b.innerHTML = esc(PUB.announce.text) + (/^https?:\/\//.test(PUB.announce.link || "") ? ` <a href="${esc(PUB.announce.link)}" target="_blank" rel="noopener">فتح</a>` : "");
+  }
+  renderCode();
+  loadQuestion();
+  loadBell();
+
+  unsubUser = onSnapshot(uref, s => {
+    const d = s.data(); if (!d) return;
+    if (!sessionReady) {
+      sessionReady = true;
+      if (d.sessionId !== SID) updateDoc(uref, { sessionId: SID }).catch(() => {});
+    } else if (d.sessionId && d.sessionId !== SID) {
+      say("تم تسجيل دخولك من جهاز آخر، فأُغلقت هذه الجلسة.", "err");
+      signOut(auth); return;
+    }
+    U = d;
+    $("memberNo").textContent = d.memberNo ? pad(d.memberNo) : "—";
+    $("who").textContent = d.name;
+    $("points").textContent = d.points;
+    $("stoppedNote").classList.toggle("hidden", d.status === "active");
+    $("setInfo").textContent = `${d.name} · ${d.memberNo ? pad(d.memberNo) : ""} · ${d.email}`;
+    if (!$("phone").dataset.f) { $("phone").value = d.phone || ""; $("fb").value = d.fb || ""; $("phone").dataset.f = 1; }
+    $("refLink").value = d.memberNo ? BLOG + "?ref=" + d.memberNo : "";
+    renderStreak(); renderQuestionState(); tick();
+  });
+
+  getDocs(query(collection(uref, "log"), orderBy("at", "desc"), limit(8))).then(renderLog).catch(() => {});
+  timer = setInterval(tick, 1000);
+}
+
+const REASONS = { daily:"مكافأة يومية", welcome:"مكافأة ترحيب", question:"سؤال اليوم", code:"كود", task:"مهمة", referral:"إحالة", admin:"تعديل من الإدارة" };
+function renderLog(s) {
+  const t = $("log"); t.textContent = "";
+  s.forEach(x => {
+    const d = x.data(), tr = t.insertRow();
+    tr.insertCell().textContent = d.at ? d.at.toDate().toLocaleString("ar") : "";
+    tr.insertCell().textContent = (d.delta > 0 ? "+" : "") + d.delta;
+    tr.insertCell().textContent = REASONS[d.reason] || "عملية";
+  });
+}
+async function refreshLog() {
+  try { renderLog(await getDocs(query(collection(uref, "log"), orderBy("at", "desc"), limit(8)))); } catch {}
+}
+
+// ---------- المكافأة اليومية ----------
+const hoursInterval = () => Number(DAILY.hours) > 0 ? Number(DAILY.hours) : 24;
+function lastClaimMs() { return U.lastClaim && U.lastClaim.toMillis ? U.lastClaim.toMillis() : 0; }
+function tick() {
+  const b = $("claimBtn");
+  if (!U.status) return;
+  if (U.status !== "active" || CFG.rewardsOpen === false || !DAILY.enabled) {
+    b.disabled = true; $("countdown").textContent = DAILY.enabled ? "" : "المكافأة اليومية متوقفة حاليًا."; return;
+  }
+  const left = lastClaimMs() + hoursInterval() * HOUR - Date.now();
+  if (left > 0) {
+    b.disabled = true;
+    const h = Math.floor(left / 3600000), m = Math.floor(left % 3600000 / 60000), s = Math.floor(left % 60000 / 1000);
+    $("countdown").textContent = `المكافأة التالية بعد ${h}س ${m}د ${s}ث`;
+  } else { b.disabled = false; $("countdown").textContent = ""; }
+}
+function streakInfo() {
+  const cur = U.streak || 0, within = cur > 0 && Date.now() < lastClaimMs() + (hoursInterval() + 24) * HOUR;
+  const next = within ? cur + 1 : 1, days = Number(DAILY.streakDays) || 7, bonus = Number(DAILY.streakBonus) || 0;
+  return { cur: within ? cur : 0, next, days, bonus, hit: bonus > 0 && next >= days };
+}
+function renderStreak() {
+  const s = streakInfo(), box = $("streakBox");
+  box.classList.toggle("hidden", !(s.bonus > 0));
+  if (s.bonus > 0) {
+    $("streakTxt").textContent = `سلسلة الحضور: ${s.cur} من ${s.days} أيام — مكافأة إضافية ${s.bonus} نقطة`;
+    $("streakBar").style.width = Math.min(100, s.cur / s.days * 100) + "%";
+  }
+}
+$("claimBtn").onclick = async () => {
+  say("");
+  const s = streakInfo(), pts = Number(DAILY.points) || 0, delta = pts + (s.hit ? s.bonus : 0);
+  try {
+    const batch = writeBatch(db);
+    batch.update(uref, { points: increment(delta), lastClaim: serverTimestamp(), streak: s.hit ? 0 : s.next });
+    batch.set(doc(collection(uref, "log")), { delta, reason: "daily", at: serverTimestamp() });
+    await batch.commit();
+    say(`تمت إضافة ${delta} نقطة إلى رصيدك.` + (s.hit ? " (شاملة مكافأة السلسلة 🎉)" : ""), "ok");
+    refreshLog();
+  } catch (e) { say("لا يمكن الاستلام الآن. ربما لم يحن الوقت بعد.", "err"); }
+};
+
+// ---------- الكود ----------
+function renderCode() {
+  const c = PUB.code, ok = c && c.active && (!c.expiresAt || c.expiresAt.toMillis() > Date.now());
+  $("codeCard").classList.toggle("hidden", !ok);
+}
+$("codeBtn").onclick = async () => {
+  say("");
+  const code = $("codeIn").value.trim().toUpperCase().replace(/[^A-Z0-9؀-ۿ_-]/g, "").slice(0, 30);
+  if (!code) return say("اكتب الكود.", "err");
+  try {
+    const cref = doc(db, "codes", code), c = await getDoc(cref);
+    if (!c.exists()) return say("الكود غير صحيح.", "err");
+    const cd = c.data();
+    if (!cd.active || (cd.expiresAt && cd.expiresAt.toMillis() < Date.now())) return say("انتهى هذا الكود.", "err");
+    if (cd.used >= cd.seats) return say("انتهت المقاعد المخصصة لهذا الكود.", "err");
+    const b = writeBatch(db);
+    b.update(cref, { used: increment(1) });
+    b.set(doc(db, "codes", code, "winners", uid), { at: serverTimestamp() });
+    b.update(uref, { points: increment(cd.points), lastCode: code, lastCodeSeq: cd.seq });
+    b.set(doc(collection(uref, "log")), { delta: cd.points, reason: "code", at: serverTimestamp() });
+    await b.commit();
+    $("codeIn").value = "";
+    say(`مبروك! أضفنا ${cd.points} نقطة.`, "ok"); refreshLog();
+  } catch { say("تعذّر تفعيل الكود. ربما استخدمته من قبل أو انتهت المقاعد.", "err"); }
+};
+
+// ---------- سؤال اليوم ----------
+async function loadQuestion() {
+  QKEY = localKey(); Q = null; qTries = 0;
+  try {
+    const q = await getDoc(doc(db, "questions", QKEY));
+    if (!q.exists()) return;
+    Q = q.data();
+    if (Q.closesAt && Q.closesAt.toMillis() < Date.now()) { Q = null; return; }
+    try { const t = await getDoc(doc(db, "tries", QKEY + "_" + uid)); if (t.exists()) qTries = t.data().count || 0; } catch {}
+  } catch { Q = null; }
+  $("qCard").classList.toggle("hidden", !Q);
+  if (Q) {
+    $("qArt").textContent = Q.articleTitle ? "من المقال: " + Q.articleTitle : "";
+    $("qText").textContent = Q.question || "";
+    $("qHint").innerHTML = [Q.hint ? "💡 تلميح: " + esc(Q.hint) : "", Q.note ? "📝 " + esc(Q.note) : ""].filter(Boolean).join("<br>");
+    renderQuestionState();
+  }
+}
+function renderQuestionState() {
+  if (!Q) return;
+  const solved = U.lastQuestion === QKEY, max = Number(Q.maxAttempts) || 3, left = Math.max(0, max - qTries);
+  $("qDone").classList.toggle("hidden", !solved);
+  $("qForm").classList.toggle("hidden", solved);
+  $("qInfo").textContent = `النقاط: ${Q.points} · المحاولات المتبقية: ${left}`;
+  $("qBtn").disabled = left <= 0 || U.status !== "active";
+}
+$("qBtn").onclick = async () => {
+  say("");
+  const guess = norm($("qIn").value);
+  if (!guess) return say("اكتب إجابتك.", "err");
+  const max = Number(Q.maxAttempts) || 3;
+  if (qTries >= max) return say("استهلكت كل المحاولات.", "err");
+  $("qBtn").disabled = true;
+  try {
+    // 1) تسجيل المحاولة (تستهلك محاولة دائمًا)
+    await setDoc(doc(db, "tries", QKEY + "_" + uid), { uid, qid: QKEY, count: qTries + 1, guess, at: serverTimestamp() });
+    qTries++;
+  } catch { renderQuestionState(); return say("تعذّر تسجيل المحاولة.", "err"); }
+  try {
+    // 2) طلب النقاط (يقبله النظام فقط إذا كانت الإجابة صحيحة)
+    const b = writeBatch(db);
+    b.update(uref, { points: increment(Q.points), lastQuestion: QKEY, lastAnswer: guess });
+    b.set(doc(collection(uref, "log")), { delta: Q.points, reason: "question", at: serverTimestamp() });
+    await b.commit();
+    say(`إجابة صحيحة! +${Q.points} نقطة 🎉`, "ok"); refreshLog();
+  } catch {
+    const left = max - qTries;
+    say(left > 0 ? `إجابة غير صحيحة. بقي ${left} محاولة.` : "إجابة غير صحيحة، انتهت محاولاتك.", "err");
+  }
+  $("qIn").value = ""; renderQuestionState();
+};
+
+// ---------- التنقل ----------
+for (const b of document.querySelectorAll("#tabs button")) b.onclick = () => openTab(b.dataset.t);
+function openTab(t) {
+  for (const b of document.querySelectorAll("#tabs button")) b.classList.toggle("on", b.dataset.t === t);
+  for (const x of ["home","tasks","msgs","rank"]) $("tab_" + x).classList.toggle("hidden", x !== t);
+  $("bellPanel").classList.add("hidden"); $("setPanel").classList.add("hidden");
+  if (t === "tasks") loadTasks();
+  if (t === "msgs") loadMsgs();
+  if (t === "rank") loadRank();
+}
+$("bellBtn").onclick = () => { $("setPanel").classList.add("hidden"); $("bellPanel").classList.toggle("hidden"); if (!$("bellPanel").classList.contains("hidden")) markSeen(); };
+$("bellClose").onclick = () => $("bellPanel").classList.add("hidden");
+$("setBtn").onclick = () => { $("bellPanel").classList.add("hidden"); $("setPanel").classList.toggle("hidden"); };
+$("setClose").onclick = () => $("setPanel").classList.add("hidden");
+
+// ---------- الإشعارات ----------
+let notes = [];
+async function loadBell() {
+  try {
+    const [n, i] = await Promise.all([
+      getDocs(query(collection(db, "notices"), orderBy("at", "desc"), limit(8))),
+      getDocs(query(collection(uref, "inbox"), orderBy("at", "desc"), limit(8))),
+    ]);
+    notes = [];
+    n.forEach(x => notes.push(x.data())); i.forEach(x => notes.push(x.data()));
+    notes = notes.filter(x => x.at && !(x.kind === "missed" && x.seq && x.seq === U.lastCodeSeq))
+                 .sort((a, b) => b.at.toMillis() - a.at.toMillis()).slice(0, 12);
+    renderBell();
+  } catch {}
+}
+function renderBell() {
+  const seen = U.seenAt && U.seenAt.toMillis ? U.seenAt.toMillis() : 0;
+  const unseen = notes.filter(x => x.at.toMillis() > seen).length;
+  const dot = $("bellDot"); dot.textContent = unseen; dot.classList.toggle("hidden", !unseen);
+  $("bellList").innerHTML = notes.length ? notes.map(x =>
+    `<div class="item">${esc(x.text)}<div class="small">${fdate(x.at)}</div></div>`).join("") : '<div class="muted">لا إشعارات.</div>';
+}
+async function markSeen() {
+  renderBell();
+  try { await updateDoc(uref, { seenAt: serverTimestamp() }); } catch {}
+  $("bellDot").classList.add("hidden");
+}
+
+// ---------- المهام ----------
+async function loadTasks() {
+  const box = $("taskList");
+  try {
+    const [t, s] = await Promise.all([
+      getDocs(query(collection(db, "tasks"), where("active", "==", true))),
+      getDocs(query(collection(db, "taskSubs"), where("uid", "==", uid))),
+    ]);
+    const subs = {}; s.forEach(x => subs[x.data().taskId] = x.data());
+    const list = []; t.forEach(x => list.push({ id: x.id, ...x.data() }));
+    list.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+    if (!list.length) { box.textContent = "لا توجد مهام حاليًا."; return; }
+    box.className = ""; box.innerHTML = "";
+    for (const k of list) {
+      const sub = subs[k.id], div = document.createElement("div"); div.className = "item";
+      const st = sub ? (sub.status === "done" ? '<span class="tag ok">مكتملة ✓</span>' : sub.status === "pending" ? '<span class="tag">قيد المراجعة</span>' : '<span class="tag err">مرفوضة</span>') : "";
+      div.innerHTML = `<b>${esc(k.title)}</b> <span class="tag">${k.points} نقطة</span> ${st}
+        <div class="small" style="margin:4px 0">${esc(k.text || "")}</div>
+        ${/^https?:\/\//.test(k.link || "") ? `<a href="${esc(k.link)}" target="_blank" rel="noopener">فتح الرابط</a>` : ""}`;
+      if (!sub || sub.status === "rejected") {
+        const inp = document.createElement("input"); inp.type = "text"; inp.maxLength = 300;
+        inp.placeholder = k.type === "auto" ? "اكتب الإجابة / الكود" : "اكتب إثبات إنجاز المهمة (نص أو رابط)";
+        const btn = document.createElement("button"); btn.textContent = "إرسال";
+        btn.onclick = () => submitTask(k, sub, inp, btn);
+        div.append(inp, btn);
+      }
+      box.append(div);
+    }
+  } catch { box.textContent = "تعذّر تحميل المهام."; }
+}
+async function submitTask(k, sub, inp, btn) {
+  say("");
+  const raw = inp.value.trim().slice(0, 300);
+  if (!raw) return say("اكتب شيئًا أولًا.", "err");
+  btn.disabled = true;
+  try {
+    if (k.type === "manual") {
+      if (sub && sub.status === "rejected") await updateDoc(doc(db, "taskSubs", k.id + "_" + uid), { status: "pending", proof: raw, at: serverTimestamp() });
+      else await setDoc(doc(db, "taskSubs", k.id + "_" + uid), { taskId: k.id, uid, memberNo: U.memberNo, name: U.name, title: k.title, proof: raw, status: "pending", at: serverTimestamp() });
+      say("تم الإرسال للمراجعة.", "ok");
+    } else {
+      const guess = norm(raw), tref = doc(db, "taskTries", k.id + "_" + uid);
+      let count = 0; try { const t = await getDoc(tref); if (t.exists()) count = t.data().count || 0; } catch {}
+      const max = Number(k.maxAttempts) || 3;
+      if (count >= max) { btn.disabled = false; return say("استهلكت كل المحاولات.", "err"); }
+      await setDoc(tref, { uid, tid: k.id, count: count + 1, guess, at: serverTimestamp() });
+      try {
+        const b = writeBatch(db);
+        b.set(doc(db, "taskSubs", k.id + "_" + uid), { taskId: k.id, uid, memberNo: U.memberNo, name: U.name, title: k.title, proof: guess, status: "done", at: serverTimestamp() });
+        b.update(uref, { points: increment(k.points), lastTask: k.id });
+        b.set(doc(collection(uref, "log")), { delta: k.points, reason: "task", at: serverTimestamp() });
+        await b.commit();
+        say(`أنجزت المهمة! +${k.points} نقطة 🎉`, "ok"); refreshLog();
+      } catch { say(`إجابة غير صحيحة. بقي ${max - count - 1} محاولة.`, "err"); }
+    }
+  } catch { say("تعذّر الإرسال.", "err"); }
+  loadTasks();
+}
+
+// ---------- الرسائل ----------
+async function loadTexts() {
+  if (TEXTS) return TEXTS;
+  try { const t = await getDoc(doc(db, "config", "texts")); TEXTS = t.exists() ? t.data() : { ready: [], requests: [] }; }
+  catch { TEXTS = { ready: [], requests: [] }; }
+  return TEXTS;
+}
+async function loadMsgs() {
+  const T = await loadTexts(), sel = $("msgSel");
+  sel.textContent = "";
+  const add = (txt, kind) => { const o = document.createElement("option"); o.textContent = txt; o.dataset.kind = kind; sel.append(o); };
+  (T.ready || []).forEach(t => add(t, "ready"));
+  (T.requests || []).forEach(t => add(t, "request"));
+  sel.onchange();
+  refreshChat();
+}
+$("msgSel").onchange = () => {
+  const o = $("msgSel").selectedOptions[0];
+  $("msgVal").classList.toggle("hidden", !(o && o.dataset.kind === "request"));
+  $("msgVal").placeholder = "اكتب القيمة المطلوبة (مثال: الاسم الجديد)";
+};
+async function refreshChat() {
+  const box = $("chat");
+  try {
+    const s = await getDocs(query(collection(uref, "chat"), orderBy("at", "desc"), limit(15)));
+    if (s.empty) { box.className = "muted"; box.textContent = "لا رسائل بعد."; return; }
+    box.className = ""; const rows = []; s.forEach(x => rows.push(x.data())); rows.reverse();
+    box.innerHTML = rows.map(m => `<div class="bubble ${m.from === "admin" ? "ad" : "me"}">${esc(m.text)}${m.value ? `<div class="small">${esc(m.value)}</div>` : ""}<div class="small">${fdate(m.at)}</div></div>`).join("");
+  } catch { box.textContent = "تعذّر تحميل المحادثة."; }
+}
+$("msgSend").onclick = async () => {
+  say("");
+  const o = $("msgSel").selectedOptions[0];
+  if (!o) return say("لا توجد رسائل جاهزة بعد.", "err");
+  const kind = o.dataset.kind, val = $("msgVal").value.trim();
+  if (kind === "request" && !val) return say("اكتب القيمة المطلوبة.", "err");
+  $("msgSend").disabled = true;
+  try {
+    const b = writeBatch(db);
+    const m = { from: "member", text: o.textContent, kind, at: serverTimestamp() };
+    if (kind === "request") m.value = val.slice(0, 100);
+    b.set(doc(collection(uref, "chat")), m);
+    const f = { unanswered: true, lastMsgAt: serverTimestamp() };
+    if (kind === "request") f.pendingReq = true;
+    b.update(uref, f);
+    await b.commit();
+    $("msgVal").value = ""; say("تم إرسال رسالتك.", "ok"); refreshChat();
+  } catch { say("تعذّر الإرسال. انتظر قليلًا بين الرسائل.", "err"); }
+  setTimeout(() => { $("msgSend").disabled = false; }, 3000);
+};
+
+// ---------- الترتيب ----------
+async function loadRank() {
+  const box = $("rankList");
+  try {
+    const r = await getDoc(doc(db, "config", "ranking"));
+    const rows = r.exists() ? (r.data().rows || []) : [];
+    if (!rows.length) { box.textContent = "الترتيب غير متاح بعد."; return; }
+    box.className = "";
+    box.innerHTML = '<table>' + rows.map((x, i) => `<tr${x.no === U.memberNo ? ' style="font-weight:700"' : ""}><td>${i + 1}</td><td>${pad(x.no)}</td><td>${x.points} نقطة</td></tr>`).join("") + "</table>" +
+      `<div class="small center" style="margin-top:8px">آخر تحديث: ${fdate(r.data().at)}</div>`;
+  } catch { box.textContent = "تعذّر تحميل الترتيب."; }
+}
+
+// ---------- الإعدادات ----------
+$("saveProfile").onclick = async () => {
+  try { await updateDoc(uref, { phone: $("phone").value.trim().slice(0, 30), fb: $("fb").value.trim().slice(0, 200) }); say("تم الحفظ.", "ok"); }
+  catch { say("تعذّر الحفظ.", "err"); }
+};
+$("copyRef").onclick = async () => {
+  try { await navigator.clipboard.writeText($("refLink").value); say("تم نسخ الرابط.", "ok"); }
+  catch { $("refLink").select(); say("حدّد الرابط وانسخه.", "err"); }
+};
+$("themeBtn").onclick = () => {
+  const dark = document.documentElement.getAttribute("data-theme") === "dark";
+  const v = dark ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", v);
+  try { localStorage.setItem("wn_theme", v); } catch {}
+};
+$("pwBtn").onclick = async () => {
+  try { await sendPasswordResetEmail(auth, auth.currentUser.email); say("أرسلنا رابط تغيير كلمة المرور إلى بريدك.", "ok"); }
+  catch (e) { say(errText(e), "err"); }
+};
+$("delBtn").onclick = async () => {
+  if (!confirm("سيتوقف حسابك وتُحفظ بياناتك لدى الإدارة. هل تريد المتابعة؟")) return;
+  try { await updateDoc(uref, { status: "stopped", pendingReq: true }); say("تم إيقاف حسابك.", "ok"); setTimeout(() => signOut(auth), 1500); }
+  catch { say("تعذّر تنفيذ الطلب.", "err"); }
+};
+</script>
+</body>
+</html>

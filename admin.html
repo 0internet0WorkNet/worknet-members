@@ -1,0 +1,741 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>لوحة الإدارة</title>
+<style>
+  :root { --bg:#f5f6fa; --card:#fff; --ink:#1d2433; --accent:#2f6fed; --muted:#6b7385; --ok:#1a8f4c; --err:#c0392b; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,"Segoe UI",Tahoma,sans-serif; background:var(--bg); color:var(--ink); }
+  main { max-width:920px; margin:0 auto; padding:14px; }
+  .card { background:var(--card); border-radius:14px; padding:16px; box-shadow:0 1px 6px rgba(0,0,0,.08); margin-top:14px; }
+  h1,h2,h3 { margin:6px 0 10px; }
+  input,select,textarea { padding:9px; border:1px solid #cfd5e2; border-radius:8px; font-size:.95rem; font-family:inherit; max-width:100%; }
+  textarea { width:100%; min-height:90px; }
+  button { padding:9px 13px; border:0; border-radius:8px; background:var(--accent); color:#fff; cursor:pointer; font-family:inherit; }
+  button.ghost { background:transparent; color:var(--accent); border:1px solid var(--accent); }
+  button.danger { background:var(--err); }
+  button.sm { padding:5px 9px; font-size:.82rem; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:6px 0; }
+  .grow { flex:1; min-width:120px; }
+  .scroll { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:.92rem; }
+  th,td { padding:8px 6px; border-bottom:1px solid #eef0f5; text-align:right; vertical-align:top; }
+  tr.click { cursor:pointer; } tr.click:hover { background:#f7f9ff; }
+  .tag { display:inline-block; padding:2px 9px; border-radius:8px; font-size:.82rem; background:#eef0f5; }
+  .tag.ok { background:#e5f6ec; color:var(--ok); } .tag.off { background:#fdeaea; color:var(--err); }
+  .muted { color:var(--muted); font-size:.88rem; }
+  .msg { min-height:1.2em; margin-top:8px; } .msg.err{color:var(--err)} .msg.ok{color:var(--ok)}
+  .hidden { display:none; }
+  .field { display:flex; flex-direction:column; gap:4px; margin:10px 0; }
+  .field label { font-size:.9rem; color:var(--muted); }
+  .kv { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #eef0f5; font-size:.92rem; gap:10px; }
+  .nav { display:flex; gap:6px; flex-wrap:wrap; }
+  .nav button { position:relative; }
+  .bubble { padding:8px 10px; border-radius:10px; margin:6px 0; background:#eef3ff; max-width:90%; }
+  .bubble.ad { background:#fff4e5; margin-right:auto; }
+  .stat { display:inline-block; min-width:140px; padding:12px; margin:4px; background:#f3f6ff; border-radius:12px; text-align:center; }
+  .stat b { display:block; font-size:1.5rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>لوحة الإدارة</h1>
+
+  <section id="loginBox" class="card">
+    <div class="row">
+      <input id="email" type="email" placeholder="بريد الإدارة" class="grow">
+      <input id="password" type="password" placeholder="كلمة المرور" class="grow">
+      <button id="loginBtn">دخول</button>
+    </div>
+  </section>
+
+  <div id="panel" class="hidden">
+    <div class="card"><div class="nav" id="nav"></div></div>
+    <div id="view"></div>
+  </div>
+  <div id="msg" class="msg"></div>
+</main>
+
+<script type="module">
+import { firebaseConfig, ADMIN_EMAIL } from "./firebase-config.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, getDocs, updateDoc, deleteDoc, collection, writeBatch, serverTimestamp,
+         Timestamp, increment, query, orderBy, where, limit, startAt, endAt, startAfter,
+         getCountFromServer, getAggregateFromServer, sum }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const $ = id => document.getElementById(id);
+const PAGE = 50;
+const pad = n => n ? "#" + String(n).padStart(4, "0") : "—";
+const fmt = t => t && t.toDate ? t.toDate().toLocaleString("ar") : "";
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const norm = s => String(s || "").normalize("NFKC").toLowerCase().replace(/[ً-ٰٟـ]/g, "")
+  .replace(/[أإآ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").replace(/\s+/g, " ").trim();
+const num = (v, d = 0) => { const n = Math.floor(Number(v)); return Number.isFinite(n) ? n : d; };
+const lines = s => String(s || "").split("\n").map(x => x.trim()).filter(Boolean);
+
+function say(t, k) { $("msg").textContent = t || ""; $("msg").className = "msg " + (k || ""); }
+function adminLog(batch, action, target, details) {
+  batch.set(doc(collection(db, "adminLog")), {
+    by: auth.currentUser.email, at: serverTimestamp(), action,
+    targetUid: target ? target.id : "", memberNo: target && target.memberNo ? target.memberNo : 0, details,
+  });
+}
+
+$("loginBtn").onclick = async () => {
+  try { await signInWithEmailAndPassword(auth, $("email").value.trim(), $("password").value); }
+  catch { say("بيانات الدخول غير صحيحة.", "err"); }
+};
+onAuthStateChanged(auth, async user => {
+  const ok = user && user.emailVerified && user.email === ADMIN_EMAIL;
+  $("loginBox").classList.toggle("hidden", !!ok);
+  $("panel").classList.toggle("hidden", !ok);
+  if (user && !ok) { say("هذا الحساب ليس حساب الإدارة.", "err"); await signOut(auth); return; }
+  if (ok) route();
+});
+
+// ---------- التنقل ----------
+const NAV = [["", "الأعضاء"], ["msgs", "الرسائل"], ["q", "الأسئلة"], ["codes", "الأكواد"], ["tasks", "المهام"], ["refs", "الإحالات"],
+  ["notify", "الإشعارات"], ["grant", "منح نقاط"], ["stats", "الإحصاءات"], ["settings", "الإعدادات"], ["log", "السجل"]];
+function renderNav(active) {
+  $("nav").innerHTML = NAV.map(([k, t]) => `<button class="${k === active ? "" : "ghost"}" data-k="${k}">${t}</button>`).join("") +
+    '<button class="ghost" id="logout" style="margin-inline-start:auto">خروج</button>';
+  for (const b of $("nav").querySelectorAll("button[data-k]")) b.onclick = () => { location.hash = b.dataset.k ? "#" + b.dataset.k : ""; if (!b.dataset.k) route(); };
+  $("logout").onclick = () => signOut(auth);
+}
+window.addEventListener("hashchange", () => { if (auth.currentUser) route(); });
+function route() {
+  say("");
+  const h = location.hash.slice(1);
+  const [a, b] = h.split("/");
+  renderNav(a === "u" ? "" : a === "chat" ? "msgs" : a);
+  ({ "": viewList, u: () => viewDetail(b), msgs: viewMsgs, chat: () => viewChat(b), q: viewQuestions, codes: viewCodes,
+     tasks: viewTasks, refs: viewRefs, notify: viewNotify, grant: viewGrant, stats: viewStats, settings: viewSettings, log: viewLog }[a] || viewList)();
+}
+const V = html => { $("view").innerHTML = html; };
+
+// =====================================================================
+// الأعضاء
+// =====================================================================
+let cursors = [null], pageIdx = 0, lastDocs = [], searching = false;
+function viewList() {
+  V(`<section class="card"><h2>الأعضاء</h2>
+    <div class="row"><select id="searchType"><option value="name">اسم</option><option value="no">رقم</option><option value="email">بريد</option></select>
+      <input id="search" class="grow" placeholder="بحث"><button id="searchBtn">بحث</button><button id="clearBtn" class="ghost">مسح</button></div>
+    <div class="row"><select id="statusFilter"><option value="">كل الحالات</option><option value="active">نشط</option><option value="stopped">متوقف</option></select>
+      <select id="sortBy"><option value="new">الأحدث</option><option value="points">الأعلى نقاطًا</option></select><span class="muted" id="hint"></span></div>
+    <div class="scroll"><table><thead><tr><th>الرقم</th><th>الاسم</th><th>النقاط</th><th>الحالة</th></tr></thead><tbody id="rows"></tbody></table></div>
+    <div class="row"><button id="prevBtn" class="ghost">السابق</button><button id="nextBtn" class="ghost">التالي</button><span class="muted" id="pageInfo"></span></div></section>`);
+  $("searchBtn").onclick = () => loadList(0);
+  $("clearBtn").onclick = () => { $("search").value = ""; loadList(0); };
+  $("statusFilter").onchange = () => loadList(0);
+  $("sortBy").onchange = () => loadList(0);
+  $("search").onkeydown = e => { if (e.key === "Enter") loadList(0); };
+  $("nextBtn").onclick = () => { cursors[pageIdx + 1] = lastDocs[lastDocs.length - 1]; loadList(pageIdx + 1); };
+  $("prevBtn").onclick = () => loadList(pageIdx - 1);
+  loadList(0);
+}
+function buildQuery(cursor) {
+  const col = collection(db, "users"), q = $("search").value.trim();
+  searching = false;
+  if (q) {
+    searching = true;
+    const t = $("searchType").value;
+    if (t === "no") return query(col, where("memberNo", "==", Number(q.replace("#", ""))), limit(PAGE));
+    if (t === "email") return query(col, where("email", "==", q.toLowerCase()), limit(PAGE));
+    const lo = q.toLowerCase();
+    return query(col, orderBy("nameLower"), startAt(lo), endAt(lo + ""), limit(PAGE));
+  }
+  const st = $("statusFilter").value, parts = [];
+  if (st) parts.push(where("status", "==", st));
+  else if ($("sortBy").value === "points") parts.push(orderBy("points", "desc"));
+  else parts.push(orderBy("createdAt", "desc"));
+  if (cursor) parts.push(startAfter(cursor));
+  parts.push(limit(PAGE));
+  return query(col, ...parts);
+}
+async function loadList(idx) {
+  pageIdx = idx; if (idx === 0) cursors = [null];
+  $("hint").textContent = $("statusFilter").value && $("sortBy").value === "points" ? "الفرز بالنقاط يعمل مع كل الحالات فقط" : "";
+  try {
+    const snap = await getDocs(buildQuery(cursors[idx]));
+    lastDocs = snap.docs;
+    const tb = $("rows"); tb.textContent = "";
+    if (!snap.size) { const td = tb.insertRow().insertCell(); td.colSpan = 4; td.className = "muted"; td.textContent = "لا نتائج."; }
+    snap.forEach(d => {
+      const u = d.data(), tr = tb.insertRow(); tr.className = "click";
+      tr.insertCell().textContent = pad(u.memberNo);
+      const nc = tr.insertCell(); nc.textContent = u.name + (u.unanswered ? " 🔴" : "") + (u.pendingReq ? " 📌" : "");
+      tr.insertCell().textContent = u.points;
+      tr.insertCell().innerHTML = `<span class="tag ${u.status === "active" ? "ok" : "off"}">${u.status === "active" ? "نشط" : "متوقف"}</span>`;
+      tr.onclick = () => { location.hash = "#u/" + d.id; };
+    });
+    $("prevBtn").disabled = idx === 0 || searching;
+    $("nextBtn").disabled = snap.size < PAGE || searching;
+    $("pageInfo").textContent = `الصفحة ${idx + 1} · ${snap.size} عضو`;
+  } catch (e) { say("تعذّر تحميل الأعضاء. " + (String(e.message || "").includes("index") ? "الاستعلام يحتاج فهرسًا." : ""), "err"); }
+}
+
+// ---------- صفحة العضو ----------
+let current = null;
+async function viewDetail(uid) {
+  V('<section class="card">...</section>');
+  try {
+    const s = await getDoc(doc(db, "users", uid));
+    if (!s.exists()) { say("العضو غير موجود.", "err"); location.hash = ""; return; }
+    current = { id: uid, ...s.data() };
+    const c = current;
+    const ls = await getDocs(query(collection(db, "users", uid, "log"), orderBy("at", "desc"), limit(20)));
+    const rows = []; ls.forEach(x => { const d = x.data(); rows.push(`<tr><td>${fmt(d.at)}</td><td>${d.delta > 0 ? "+" : ""}${d.delta}</td><td>${esc(d.reason)}</td></tr>`); });
+    V(`<section class="card">
+      <div class="row"><button id="backBtn" class="ghost">رجوع</button><h2 style="margin:0">${pad(c.memberNo)} ${esc(c.name)}</h2></div>
+      <div class="kv"><span>البريد</span><span>${esc(c.email)}</span></div>
+      <div class="kv"><span>تاريخ التسجيل</span><span>${fmt(c.createdAt)}</span></div>
+      <div class="kv"><span>الهاتف</span><span>${esc(c.phone || "—")}</span></div>
+      <div class="kv"><span>فيسبوك</span><span>${esc(c.fb || "—")}</span></div>
+      <div class="kv"><span>جاء عن طريق العضو</span><span>${c.refBy ? pad(c.refBy) : "—"}</span></div>
+      <div class="kv"><span>سلسلة الحضور</span><span>${c.streak || 0}</span></div>
+      <div class="field"><label>الاسم</label><input id="dName" maxlength="40" value="${esc(c.name)}"></div>
+      <div class="field"><label>النقاط</label><input id="dPoints" type="number" step="1" value="${c.points}"></div>
+      <div class="field"><label>الحالة</label><select id="dStatus"><option value="active">نشط</option><option value="stopped">متوقف</option></select></div>
+      <div class="row"><button id="dSave">حفظ</button><button id="dChat" class="ghost">المحادثة</button><button id="dDelete" class="danger">حذف الحساب</button></div>
+      <h3>إشعار لهذا العضو</h3>
+      <div class="row"><input id="nText" class="grow" maxlength="300" placeholder="نص الإشعار"><button id="nSend">إرسال</button></div>
+      <h3>سجل نقاط العضو</h3><div class="scroll"><table><tbody>${rows.join("")}</tbody></table></div></section>`);
+    $("dStatus").value = c.status === "active" ? "active" : "stopped";
+    $("backBtn").onclick = () => { location.hash = ""; };
+    $("dChat").onclick = () => { location.hash = "#chat/" + uid; };
+    $("dSave").onclick = saveMember;
+    $("dDelete").onclick = deleteMember;
+    $("nSend").onclick = async () => {
+      const t = $("nText").value.trim(); if (!t) return;
+      try { await setDoc(doc(collection(db, "users", uid, "inbox")), { text: t.slice(0, 300), kind: "admin", at: serverTimestamp() }); say("تم إرسال الإشعار.", "ok"); $("nText").value = ""; }
+      catch { say("تعذّر الإرسال.", "err"); }
+    };
+  } catch { say("تعذّر تحميل العضو.", "err"); }
+}
+async function saveMember() {
+  const nm = $("dName").value.trim().slice(0, 40), pts = num($("dPoints").value, NaN), st = $("dStatus").value;
+  if (!nm || !Number.isFinite(pts)) return say("تحقق من الاسم والنقاط.", "err");
+  const ch = [];
+  if (nm !== current.name) ch.push(`الاسم: ${current.name} ← ${nm}`);
+  if (pts !== current.points) ch.push(`النقاط: ${current.points} ← ${pts}`);
+  if (st !== current.status) ch.push(`الحالة: ${current.status} ← ${st}`);
+  if (!ch.length) return say("لا تغييرات.", "err");
+  try {
+    const b = writeBatch(db), ref = doc(db, "users", current.id);
+    b.update(ref, { name: nm, nameLower: nm.toLowerCase(), points: pts, status: st });
+    if (pts !== current.points) b.set(doc(collection(ref, "log")), { delta: pts - current.points, reason: "admin", by: auth.currentUser.email, at: serverTimestamp() });
+    adminLog(b, "edit_user", current, ch.join(" | "));
+    await b.commit(); say("تم الحفظ.", "ok"); viewDetail(current.id);
+  } catch { say("تعذّر الحفظ.", "err"); }
+}
+async function deleteMember() {
+  if (!confirm(`حذف حساب ${current.name} نهائيًا؟ يفضّل تحويله إلى «متوقف».`)) return;
+  try {
+    const b = writeBatch(db);
+    b.delete(doc(db, "users", current.id));
+    adminLog(b, "delete_user", current, `حذف ${current.name} (${current.email})`);
+    await b.commit(); say("تم الحذف.", "ok"); location.hash = "";
+  } catch { say("تعذّر الحذف.", "err"); }
+}
+
+// =====================================================================
+// الرسائل
+// =====================================================================
+async function viewMsgs() {
+  V(`<section class="card"><h2>الرسائل والطلبات</h2>
+    <div class="row"><button id="tMsg">رسائل لم يُرد عليها 🔴</button><button id="tReq" class="ghost">طلبات معلّقة 📌</button></div>
+    <div class="scroll"><table><tbody id="mRows"></tbody></table></div></section>`);
+  const load = async field => {
+    const tb = $("mRows"); tb.textContent = "";
+    try {
+      const s = await getDocs(query(collection(db, "users"), where(field, "==", true), limit(PAGE)));
+      if (s.empty) { tb.insertRow().insertCell().textContent = "لا شيء معلّق."; return; }
+      s.forEach(d => { const u = d.data(), tr = tb.insertRow(); tr.className = "click";
+        tr.insertCell().textContent = pad(u.memberNo); tr.insertCell().textContent = u.name;
+        tr.onclick = () => { location.hash = "#chat/" + d.id; }; });
+    } catch { say("تعذّر التحميل.", "err"); }
+  };
+  $("tMsg").onclick = () => { $("tMsg").className = ""; $("tReq").className = "ghost"; load("unanswered"); };
+  $("tReq").onclick = () => { $("tReq").className = ""; $("tMsg").className = "ghost"; load("pendingReq"); };
+  load("unanswered");
+}
+async function viewChat(uid) {
+  V('<section class="card">...</section>');
+  try {
+    const [us, cs, ts] = await Promise.all([getDoc(doc(db, "users", uid)),
+      getDocs(query(collection(db, "users", uid, "chat"), orderBy("at", "desc"), limit(30))), getDoc(doc(db, "config", "texts"))]);
+    if (!us.exists()) { say("العضو غير موجود.", "err"); return; }
+    const u = { id: uid, ...us.data() }, replies = ts.exists() ? (ts.data().replies || []) : [];
+    const msgs = []; cs.forEach(x => msgs.push(x.data())); msgs.reverse();
+    V(`<section class="card"><div class="row"><button id="back" class="ghost">رجوع</button><h2 style="margin:0">${pad(u.memberNo)} ${esc(u.name)}</h2><button id="toUser" class="ghost sm">صفحة العضو</button></div>
+      ${u.pendingReq ? '<p><span class="tag off">طلب معلّق</span></p>' : ""}
+      <div>${msgs.map(m => `<div class="bubble ${m.from === "admin" ? "ad" : ""}">${esc(m.text)}${m.value ? `<div class="muted">القيمة: <b>${esc(m.value)}</b></div>` : ""}<div class="muted">${fmt(m.at)}</div></div>`).join("") || '<p class="muted">لا رسائل.</p>'}</div>
+      <h3>الرد</h3>
+      <div class="row"><select id="rSel" class="grow"><option value="">— رد جاهز —</option>${replies.map(r => `<option>${esc(r)}</option>`).join("")}</select></div>
+      <textarea id="rText" placeholder="أو اكتب ردًا حرًا"></textarea>
+      <div class="row"><button id="rSend">إرسال الرد</button><button id="rDone" class="ghost">إنهاء بدون رد</button></div></section>`);
+    $("back").onclick = () => { location.hash = "#msgs"; };
+    $("toUser").onclick = () => { location.hash = "#u/" + uid; };
+    $("rSel").onchange = () => { if ($("rSel").value) $("rText").value = $("rSel").value; };
+    $("rDone").onclick = async () => { try { await updateDoc(doc(db, "users", uid), { unanswered: false, pendingReq: false }); say("تم.", "ok"); viewChat(uid); } catch { say("تعذّر.", "err"); } };
+    $("rSend").onclick = async () => {
+      const t = $("rText").value.trim().slice(0, 500); if (!t) return say("اكتب الرد.", "err");
+      try {
+        const b = writeBatch(db), ref = doc(db, "users", uid);
+        b.set(doc(collection(ref, "chat")), { from: "admin", text: t, kind: "reply", at: serverTimestamp() });
+        b.set(doc(collection(ref, "inbox")), { text: "ردّت الإدارة على رسالتك. افتح تبويب الرسائل.", kind: "admin", at: serverTimestamp() });
+        b.update(ref, { unanswered: false, pendingReq: false });
+        await b.commit(); say("تم الرد.", "ok"); viewChat(uid);
+      } catch { say("تعذّر الإرسال.", "err"); }
+    };
+  } catch { say("تعذّر تحميل المحادثة.", "err"); }
+}
+
+// =====================================================================
+// الأسئلة اليومية
+// =====================================================================
+const dstr = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+async function viewQuestions() {
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+  V(`<section class="card"><h2>جدولة سؤال يومي</h2>
+    <div class="field"><label>التاريخ</label><input id="qDate" type="date" value="${dstr(tomorrow)}"></div>
+    <div class="field"><label>عنوان المقال</label><input id="qArt" maxlength="150"></div>
+    <div class="field"><label>السؤال</label><input id="qText" maxlength="300"></div>
+    <div class="field"><label>الجواب (يُخفى عن الأعضاء)</label><input id="qAns" maxlength="100"></div>
+    <div class="field"><label>تلميح (يظهر للعضو)</label><input id="qHint" maxlength="200"></div>
+    <div class="field"><label>ملاحظة (تظهر للعضو)</label><input id="qNote" maxlength="200"></div>
+    <div class="row"><label>النقاط <input id="qPts" type="number" min="0" value="5" style="width:90px"></label>
+      <label>عدد المحاولات <input id="qMax" type="number" min="1" value="3" style="width:90px"></label></div>
+    <div class="row"><button id="qSave">حفظ السؤال</button><button id="qDel" class="danger hidden">حذف هذا اليوم</button></div>
+    <p class="muted">السؤال يظهر للأعضاء من منتصف الليل بتوقيت جهازك حتى منتصف الليل التالي.</p></section>
+    <section class="card"><h3>الأسئلة القادمة والأخيرة</h3><div class="scroll"><table><tbody id="qRows"></tbody></table></div></section>`);
+  $("qSave").onclick = async () => {
+    const date = $("qDate").value, text = $("qText").value.trim(), ans = norm($("qAns").value);
+    if (!date || !text || !ans) return say("التاريخ والسؤال والجواب مطلوبة.", "err");
+    const [y, m, d] = date.split("-").map(Number);
+    const opens = new Date(y, m - 1, d), closes = new Date(y, m - 1, d + 1);
+    try {
+      const b = writeBatch(db);
+      b.set(doc(db, "questions", date), { date, articleTitle: $("qArt").value.trim(), question: text, hint: $("qHint").value.trim(), note: $("qNote").value.trim(),
+        points: Math.max(0, num($("qPts").value)), maxAttempts: Math.max(1, num($("qMax").value, 3)), opensAt: Timestamp.fromDate(opens), closesAt: Timestamp.fromDate(closes) });
+      b.set(doc(db, "questionKeys", date), { answer: ans });
+      adminLog(b, "question", null, `سؤال ${date}`);
+      await b.commit(); say("تم حفظ السؤال.", "ok"); loadQRows();
+    } catch { say("تعذّر الحفظ.", "err"); }
+  };
+  $("qDel").onclick = async () => {
+    const date = $("qDate").value; if (!confirm("حذف سؤال " + date + "؟")) return;
+    try { const b = writeBatch(db); b.delete(doc(db, "questions", date)); b.delete(doc(db, "questionKeys", date)); await b.commit(); say("تم الحذف.", "ok"); loadQRows(); } catch { say("تعذّر.", "err"); }
+  };
+  loadQRows();
+}
+async function loadQRows() {
+  const tb = $("qRows"); tb.textContent = "";
+  try {
+    const from = new Date(); from.setDate(from.getDate() - 3); from.setHours(0, 0, 0, 0);
+    const s = await getDocs(query(collection(db, "questions"), where("opensAt", ">=", Timestamp.fromDate(from)), orderBy("opensAt"), limit(30)));
+    if (s.empty) tb.insertRow().insertCell().textContent = "لا أسئلة مجدولة.";
+    s.forEach(x => {
+      const q = x.data(), tr = tb.insertRow(); tr.className = "click";
+      tr.innerHTML = `<td>${esc(q.date)}</td><td>${esc(q.question)}</td><td>${q.points} نقطة</td>`;
+      tr.onclick = async () => {
+        $("qDate").value = q.date; $("qArt").value = q.articleTitle || ""; $("qText").value = q.question; $("qHint").value = q.hint || "";
+        $("qNote").value = q.note || ""; $("qPts").value = q.points; $("qMax").value = q.maxAttempts; $("qDel").classList.remove("hidden");
+        try { const k = await getDoc(doc(db, "questionKeys", q.date)); $("qAns").value = k.exists() ? k.data().answer : ""; } catch {}
+        window.scrollTo(0, 0);
+      };
+    });
+  } catch { say("تعذّر تحميل الأسئلة.", "err"); }
+}
+
+// =====================================================================
+// الأكواد
+// =====================================================================
+const genCode = () => { const c = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s = ""; for (let i = 0; i < 8; i++) s += c[Math.floor(Math.random() * c.length)]; return s; };
+async function viewCodes() {
+  V(`<section class="card"><h2>إنشاء كود</h2>
+    <div class="row"><input id="cCode" placeholder="الكود (اتركه فارغًا لتوليد كود)" class="grow"><button id="cGen" class="ghost">توليد</button></div>
+    <div class="row"><label>النقاط <input id="cPts" type="number" min="1" value="10" style="width:90px"></label>
+      <label>عدد المقاعد <input id="cSeats" type="number" min="1" value="10" style="width:90px"></label>
+      <label>مدة الصلاحية بالدقائق (0 = بلا حد) <input id="cMin" type="number" min="0" value="60" style="width:90px"></label></div>
+    <label><input id="cNotify" type="checkbox" checked> إرسال إشعار «كود جديد» للجميع (لا يتضمن الكود)</label>
+    <div class="row"><button id="cSave">إنشاء وتفعيل الكود</button></div></section>
+    <section class="card"><h3>آخر الأكواد</h3><div class="scroll"><table><thead><tr><th>الكود</th><th>النقاط</th><th>المستخدم</th><th>الحالة</th><th></th></tr></thead><tbody id="cRows"></tbody></table></div></section>`);
+  $("cGen").onclick = () => { $("cCode").value = genCode(); };
+  $("cSave").onclick = async () => {
+    const code = ($("cCode").value.trim().toUpperCase().replace(/[^A-Z0-9؀-ۿ_-]/g, "") || genCode()).slice(0, 30);
+    const pts = num($("cPts").value), seats = num($("cSeats").value), mins = num($("cMin").value);
+    if (pts < 1 || seats < 1) return say("تحقق من النقاط والمقاعد.", "err");
+    const seq = Date.now(), exp = mins > 0 ? Timestamp.fromMillis(seq + mins * 60000) : null;
+    try {
+      if ((await getDoc(doc(db, "codes", code))).exists()) return say("هذا الكود موجود من قبل.", "err");
+      const b = writeBatch(db);
+      b.set(doc(db, "codes", code), { points: pts, seats, used: 0, active: true, expiresAt: exp, seq, createdAt: serverTimestamp() });
+      b.set(doc(db, "config", "public"), { code: { active: true, expiresAt: exp, seq } }, { merge: true });
+      if ($("cNotify").checked) b.set(doc(collection(db, "notices")), { text: "🎁 كود جديد متاح الآن! ادخل صفحة الرئيسية وفعّله قبل انتهاء المقاعد.", kind: "code", seq, at: serverTimestamp() });
+      adminLog(b, "code_create", null, `كود ${code} · ${pts} نقطة · ${seats} مقعد`);
+      await b.commit(); say(`تم إنشاء الكود: ${code}`, "ok"); $("cCode").value = ""; loadCodes();
+    } catch { say("تعذّر الإنشاء.", "err"); }
+  };
+  loadCodes();
+}
+async function loadCodes() {
+  const tb = $("cRows"); tb.textContent = "";
+  try {
+    const s = await getDocs(query(collection(db, "codes"), orderBy("seq", "desc"), limit(20)));
+    s.forEach(x => {
+      const c = x.data(), tr = tb.insertRow();
+      const expired = c.expiresAt && c.expiresAt.toMillis() < Date.now();
+      tr.innerHTML = `<td><b>${esc(x.id)}</b></td><td>${c.points}</td><td>${c.used}/${c.seats}</td><td><span class="tag ${c.active && !expired ? "ok" : "off"}">${c.active ? (expired ? "منتهي" : "فعّال") : "مغلق"}</span></td><td></td>`;
+      if (c.active) {
+        const bt = document.createElement("button"); bt.className = "sm danger"; bt.textContent = "إغلاق"; tr.cells[4].append(bt);
+        bt.onclick = async () => {
+          const missed = confirm("إغلاق الكود. هل ترسل إشعار «فاتك الكود» لمن لم يستخدمه؟ (موافق = نعم)");
+          try {
+            const b = writeBatch(db);
+            b.update(doc(db, "codes", x.id), { active: false });
+            b.set(doc(db, "config", "public"), { code: { active: false, expiresAt: null, seq: c.seq } }, { merge: true });
+            if (missed) b.set(doc(collection(db, "notices")), { text: "⏰ فاتك كود الجوائز هذه المرة. تابعنا لتلحق بالقادم!", kind: "missed", seq: c.seq, at: serverTimestamp() });
+            adminLog(b, "code_close", null, `إغلاق ${x.id}`);
+            await b.commit(); say("تم الإغلاق.", "ok"); loadCodes();
+          } catch { say("تعذّر.", "err"); }
+        };
+      }
+    });
+  } catch { say("تعذّر تحميل الأكواد.", "err"); }
+}
+
+// =====================================================================
+// المهام
+// =====================================================================
+async function viewTasks() {
+  V(`<section class="card"><h2>مهمة جديدة</h2>
+    <div class="field"><label>العنوان</label><input id="tTitle" maxlength="100"></div>
+    <div class="field"><label>الشرح</label><textarea id="tText" maxlength="500" style="min-height:60px"></textarea></div>
+    <div class="field"><label>الرابط (اختياري)</label><input id="tLink" maxlength="300"></div>
+    <div class="row"><label>النقاط <input id="tPts" type="number" min="1" value="10" style="width:90px"></label>
+      <label>النوع <select id="tType"><option value="manual">مراجعة يدوية</option><option value="auto">تحقق تلقائي بجواب</option></select></label></div>
+    <div id="autoBox" class="hidden row"><input id="tAns" placeholder="الجواب الصحيح (مخفي)" class="grow"><label>المحاولات <input id="tMax" type="number" min="1" value="3" style="width:80px"></label></div>
+    <div class="row"><button id="tSave">إضافة المهمة</button></div></section>
+    <section class="card"><h3>طلبات تحتاج مراجعة</h3><div class="scroll"><table><tbody id="sRows"></tbody></table></div></section>
+    <section class="card"><h3>المهام</h3><div class="scroll"><table><tbody id="tRows"></tbody></table></div></section>`);
+  $("tType").onchange = () => $("autoBox").classList.toggle("hidden", $("tType").value !== "auto");
+  $("tSave").onclick = async () => {
+    const title = $("tTitle").value.trim(), type = $("tType").value, ans = norm($("tAns").value);
+    if (!title) return say("اكتب العنوان.", "err");
+    if (type === "auto" && !ans) return say("اكتب الجواب الصحيح.", "err");
+    try {
+      const ref = doc(collection(db, "tasks")), b = writeBatch(db);
+      b.set(ref, { title, text: $("tText").value.trim(), link: $("tLink").value.trim(), points: Math.max(1, num($("tPts").value, 1)), type, active: true,
+        maxAttempts: Math.max(1, num($("tMax").value, 3)), createdAt: serverTimestamp() });
+      if (type === "auto") b.set(doc(db, "taskKeys", ref.id), { answer: ans });
+      adminLog(b, "task_create", null, title);
+      await b.commit(); say("تمت الإضافة.", "ok"); viewTasks();
+    } catch { say("تعذّر الحفظ.", "err"); }
+  };
+  try {
+    const s = await getDocs(query(collection(db, "taskSubs"), where("status", "==", "pending"), limit(50)));
+    const tb = $("sRows");
+    if (s.empty) tb.insertRow().insertCell().textContent = "لا شيء للمراجعة.";
+    s.forEach(x => {
+      const d = x.data(), tr = tb.insertRow();
+      tr.innerHTML = `<td>${pad(d.memberNo)} ${esc(d.name)}</td><td>${esc(d.title)}</td><td style="word-break:break-all">${esc(d.proof)}</td><td></td>`;
+      const ok = document.createElement("button"); ok.className = "sm"; ok.textContent = "قبول";
+      const no = document.createElement("button"); no.className = "sm danger"; no.textContent = "رفض";
+      tr.cells[3].append(ok, " ", no);
+      ok.onclick = async () => {
+        try {
+          const t = await getDoc(doc(db, "tasks", d.taskId)), pts = t.exists() ? t.data().points : 0, uref = doc(db, "users", d.uid), b = writeBatch(db);
+          b.update(doc(db, "taskSubs", x.id), { status: "done" });
+          b.update(uref, { points: increment(pts) });
+          b.set(doc(collection(uref, "log")), { delta: pts, reason: "task", by: auth.currentUser.email, at: serverTimestamp() });
+          b.set(doc(collection(uref, "inbox")), { text: `تم قبول مهمتك «${d.title}» وأضفنا ${pts} نقطة.`, kind: "admin", at: serverTimestamp() });
+          adminLog(b, "task_approve", { id: d.uid, memberNo: d.memberNo }, `${d.title} +${pts}`);
+          await b.commit(); say("تم القبول.", "ok"); viewTasks();
+        } catch { say("تعذّر.", "err"); }
+      };
+      no.onclick = async () => {
+        try {
+          const b = writeBatch(db);
+          b.update(doc(db, "taskSubs", x.id), { status: "rejected" });
+          b.set(doc(collection(db, "users", d.uid, "inbox")), { text: `لم تُقبل مهمتك «${d.title}». يمكنك إعادة المحاولة.`, kind: "admin", at: serverTimestamp() });
+          await b.commit(); say("تم الرفض.", "ok"); viewTasks();
+        } catch { say("تعذّر.", "err"); }
+      };
+    });
+    const ts = await getDocs(query(collection(db, "tasks"), limit(50)));
+    const tb2 = $("tRows");
+    ts.forEach(x => {
+      const t = x.data(), tr = tb2.insertRow();
+      tr.innerHTML = `<td>${esc(t.title)}</td><td>${t.points} نقطة</td><td>${t.type === "auto" ? "تلقائي" : "يدوي"}</td><td><span class="tag ${t.active ? "ok" : "off"}">${t.active ? "فعّالة" : "متوقفة"}</span></td><td></td>`;
+      const tg = document.createElement("button"); tg.className = "sm ghost"; tg.textContent = t.active ? "إيقاف" : "تفعيل";
+      tg.onclick = async () => { try { await updateDoc(doc(db, "tasks", x.id), { active: !t.active }); viewTasks(); } catch { say("تعذّر.", "err"); } };
+      tr.cells[4].append(tg);
+    });
+  } catch { say("تعذّر تحميل المهام.", "err"); }
+}
+
+// =====================================================================
+// الإحالات
+// =====================================================================
+async function viewRefs() {
+  V('<section class="card"><h2>إحالات جديدة</h2><div class="scroll"><table><tbody id="rRows"></tbody></table></div></section>');
+  try {
+    const app = await getDoc(doc(db, "config", "app")), reward = app.exists() ? num(app.data().referralPoints) : 0;
+    const s = await getDocs(query(collection(db, "referrals"), where("status", "==", "pending"), limit(50)));
+    const tb = $("rRows");
+    if (s.empty) tb.insertRow().insertCell().textContent = "لا إحالات جديدة.";
+    s.forEach(x => {
+      const r = x.data(), tr = tb.insertRow();
+      tr.innerHTML = `<td>العضو الجديد ${pad(r.newNo)}</td><td>جاء عن طريق ${pad(r.refNo)}</td><td>${fmt(r.at)}</td><td></td>`;
+      const ok = document.createElement("button"); ok.className = "sm"; ok.textContent = `اعتماد (${reward} نقطة)`;
+      const no = document.createElement("button"); no.className = "sm danger"; no.textContent = "رفض";
+      tr.cells[3].append(ok, " ", no);
+      ok.onclick = async () => {
+        try {
+          const b = writeBatch(db);
+          if (reward > 0) {
+            const f = await getDocs(query(collection(db, "users"), where("memberNo", "==", r.refNo), limit(1)));
+            if (f.empty) return say("المُحيل غير موجود.", "err");
+            const uref = f.docs[0].ref;
+            b.update(uref, { points: increment(reward) });
+            b.set(doc(collection(uref, "log")), { delta: reward, reason: "referral", by: auth.currentUser.email, at: serverTimestamp() });
+            b.set(doc(collection(uref, "inbox")), { text: `شكرًا! انضم عضو جديد عن طريقك وأضفنا ${reward} نقطة.`, kind: "admin", at: serverTimestamp() });
+          }
+          b.update(doc(db, "referrals", x.id), { status: "approved" });
+          adminLog(b, "referral_approve", null, `${pad(r.refNo)} ← ${pad(r.newNo)} (${reward})`);
+          await b.commit(); say("تم الاعتماد.", "ok"); viewRefs();
+        } catch { say("تعذّر.", "err"); }
+      };
+      no.onclick = async () => { try { await updateDoc(doc(db, "referrals", x.id), { status: "rejected" }); viewRefs(); } catch { say("تعذّر.", "err"); } };
+    });
+  } catch { say("تعذّر تحميل الإحالات.", "err"); }
+}
+
+// =====================================================================
+// الإشعارات وشريط الإعلان
+// =====================================================================
+async function viewNotify() {
+  let pub = {}; try { const p = await getDoc(doc(db, "config", "public")); if (p.exists()) pub = p.data(); } catch {}
+  const A = pub.announce || {};
+  V(`<section class="card"><h2>إشعار للجميع 🔔</h2>
+    <div class="row"><input id="bText" class="grow" maxlength="300" placeholder="نص الإشعار"><button id="bSend">إرسال للجميع</button></div></section>
+    <section class="card"><h2>إشعار لعضو برقمه</h2>
+    <div class="row"><input id="oNo" type="number" placeholder="رقم العضو" style="width:120px"><input id="oText" class="grow" maxlength="300" placeholder="نص الإشعار"><button id="oSend">إرسال</button></div></section>
+    <section class="card"><h2>شريط الإعلان</h2>
+    <div class="field"><label>النص</label><input id="aText" maxlength="200" value="${esc(A.text || "")}"></div>
+    <div class="field"><label>رابط (اختياري)</label><input id="aLink" maxlength="300" value="${esc(A.link || "")}"></div>
+    <label><input id="aOn" type="checkbox" ${A.on ? "checked" : ""}> ظاهر للأعضاء</label>
+    <div class="row"><button id="aSave">حفظ الشريط</button></div></section>
+    <section class="card"><h3>آخر الإشعارات العامة</h3><div class="scroll"><table><tbody id="nRows"></tbody></table></div></section>`);
+  $("bSend").onclick = async () => {
+    const t = $("bText").value.trim(); if (!t) return;
+    try { const b = writeBatch(db); b.set(doc(collection(db, "notices")), { text: t, kind: "broadcast", at: serverTimestamp() }); adminLog(b, "notice", null, t); await b.commit(); say("تم الإرسال.", "ok"); $("bText").value = ""; viewNotify(); }
+    catch { say("تعذّر.", "err"); }
+  };
+  $("oSend").onclick = async () => {
+    const no = num($("oNo").value), t = $("oText").value.trim(); if (!no || !t) return say("اكتب الرقم والنص.", "err");
+    try {
+      const f = await getDocs(query(collection(db, "users"), where("memberNo", "==", no), limit(1)));
+      if (f.empty) return say("لا يوجد عضو بهذا الرقم.", "err");
+      await setDoc(doc(collection(f.docs[0].ref, "inbox")), { text: t, kind: "admin", at: serverTimestamp() });
+      say("تم الإرسال.", "ok"); $("oText").value = "";
+    } catch { say("تعذّر.", "err"); }
+  };
+  $("aSave").onclick = async () => {
+    try {
+      const b = writeBatch(db);
+      b.set(doc(db, "config", "public"), { announce: { text: $("aText").value.trim(), link: $("aLink").value.trim(), on: $("aOn").checked } }, { merge: true });
+      adminLog(b, "announce", null, $("aText").value.trim());
+      await b.commit(); say("تم الحفظ.", "ok");
+    } catch { say("تعذّر.", "err"); }
+  };
+  try {
+    const s = await getDocs(query(collection(db, "notices"), orderBy("at", "desc"), limit(15)));
+    s.forEach(x => {
+      const d = x.data(), tr = $("nRows").insertRow();
+      tr.innerHTML = `<td>${fmt(d.at)}</td><td>${esc(d.text)}</td><td></td>`;
+      const del = document.createElement("button"); del.className = "sm danger"; del.textContent = "حذف";
+      del.onclick = async () => { try { await deleteDoc(doc(db, "notices", x.id)); viewNotify(); } catch { say("تعذّر.", "err"); } };
+      tr.cells[2].append(del);
+    });
+  } catch {}
+}
+
+// =====================================================================
+// منح نقاط جماعي
+// =====================================================================
+function viewGrant() {
+  V(`<section class="card"><h2>منح نقاط جماعي</h2>
+    <div class="row"><label>النقاط <input id="gPts" type="number" value="5" style="width:100px"></label>
+      <label>من رقم <input id="gFrom" type="number" value="1" min="1" style="width:100px"></label>
+      <label>إلى رقم <input id="gTo" type="number" value="999999" min="1" style="width:110px"></label></div>
+    <label><input id="gLog" type="checkbox" checked> تسجيل العملية في سجل كل عضو (تستهلك كتابتين لكل عضو بدل كتابة)</label>
+    <div class="row"><button id="gGo">تنفيذ</button></div>
+    <p class="muted">الخطة المجانية تسمح بحوالي 20 ألف كتابة يوميًا. يُمنح الأعضاء النشطون فقط. استخدم نطاق الأرقام لتقسيم العملية على أكثر من يوم إن كان العدد كبيرًا.</p>
+    <div id="gOut" class="muted"></div></section>`);
+  $("gGo").onclick = async () => {
+    const pts = num($("gPts").value), from = num($("gFrom").value, 1), to = num($("gTo").value, 999999), withLog = $("gLog").checked;
+    if (!pts) return say("اكتب عدد النقاط.", "err");
+    if (!confirm(`منح ${pts} نقطة لكل عضو نشط من ${from} إلى ${to}؟`)) return;
+    $("gGo").disabled = true; let done = 0, last = null;
+    try {
+      for (;;) {
+        const parts = [where("memberNo", ">=", from), where("memberNo", "<=", to), orderBy("memberNo")];
+        if (last) parts.push(startAfter(last));
+        parts.push(limit(200));
+        const s = await getDocs(query(collection(db, "users"), ...parts));
+        if (s.empty) break;
+        const b = writeBatch(db); let n = 0;
+        s.forEach(x => {
+          if (x.data().status !== "active") return;
+          b.update(x.ref, { points: increment(pts) }); n++;
+          if (withLog) b.set(doc(collection(x.ref, "log")), { delta: pts, reason: "admin", by: auth.currentUser.email, at: serverTimestamp() });
+        });
+        if (n) await b.commit();
+        done += n; last = s.docs[s.docs.length - 1];
+        $("gOut").textContent = `تم منح ${done} عضو...`;
+        if (s.size < 200) break;
+      }
+      const b = writeBatch(db); adminLog(b, "bulk_grant", null, `${pts} نقطة لـ ${done} عضو (${from}-${to})`); await b.commit();
+      say(`اكتمل: ${done} عضو.`, "ok");
+    } catch { say(`توقفت العملية بعد ${done} عضو (ربما بلغت الحد المجاني). استأنف من رقم أعلى.`, "err"); }
+    $("gGo").disabled = false;
+  };
+}
+
+// =====================================================================
+// الإحصاءات والترتيب
+// =====================================================================
+function viewStats() {
+  V(`<section class="card"><h2>الإحصاءات</h2><button id="stGo">تحديث الأرقام</button>
+    <p class="muted">كل ضغطة تستهلك قراءات قليلة من الحصة المجانية.</p><div id="stOut"></div></section>
+    <section class="card"><h2>الترتيب</h2>
+    <div class="row"><label>عدد الأعضاء في القائمة <input id="rkN" type="number" value="20" min="3" max="100" style="width:90px"></label><button id="rkGo">تحديث الترتيب للأعضاء</button></div>
+    <p class="muted">يظهر للأعضاء بأرقام العضوية فقط، ويُفعَّل من الإعدادات.</p></section>`);
+  const stat = (t, v) => `<div class="stat"><b>${v}</b>${t}</div>`;
+  $("stGo").onclick = async () => {
+    const mid = new Date(); mid.setHours(0, 0, 0, 0);
+    try {
+      const u = collection(db, "users");
+      const [tot, act, today, stopped, sm, newToday, un, ps, pr] = await Promise.all([
+        getCountFromServer(u),
+        getCountFromServer(query(u, where("status", "==", "active"))),
+        getCountFromServer(query(u, where("lastClaim", ">=", Timestamp.fromDate(mid)))),
+        getCountFromServer(query(u, where("status", "==", "stopped"))),
+        getAggregateFromServer(u, { total: sum("points") }),
+        getCountFromServer(query(u, where("createdAt", ">=", Timestamp.fromDate(mid)))),
+        getCountFromServer(query(u, where("unanswered", "==", true))),
+        getCountFromServer(query(collection(db, "taskSubs"), where("status", "==", "pending"))),
+        getCountFromServer(query(collection(db, "referrals"), where("status", "==", "pending"))),
+      ]);
+      $("stOut").innerHTML = stat("إجمالي الأعضاء", tot.data().count) + stat("نشطون", act.data().count) + stat("استلموا اليوم", today.data().count) +
+        stat("سجّلوا اليوم", newToday.data().count) + stat("متوقفون", stopped.data().count) + stat("إجمالي النقاط الموزعة", sm.data().total) +
+        stat("رسائل بلا رد", un.data().count) + stat("مهام للمراجعة", ps.data().count) + stat("إحالات جديدة", pr.data().count);
+    } catch { say("تعذّر جلب الإحصاءات.", "err"); }
+  };
+  $("rkGo").onclick = async () => {
+    const n = Math.min(100, Math.max(3, num($("rkN").value, 20)));
+    try {
+      const s = await getDocs(query(collection(db, "users"), orderBy("points", "desc"), limit(n * 2)));
+      const rows = []; s.forEach(x => { const d = x.data(); if (d.status === "active" && d.memberNo && rows.length < n) rows.push({ no: d.memberNo, points: d.points }); });
+      await setDoc(doc(db, "config", "ranking"), { rows, at: serverTimestamp() });
+      say(`تم تحديث الترتيب (${rows.length}).`, "ok");
+    } catch { say("تعذّر.", "err"); }
+  };
+}
+
+// =====================================================================
+// الإعدادات
+// =====================================================================
+const DEF_TEXTS = {
+  ready: ["أريد الاستفسار عن نقاطي", "لم أستلم مكافأتي اليومية", "واجهت مشكلة في الدخول", "كيف أحصل على نقاط أكثر؟", "شكرًا لكم"],
+  requests: ["طلب تغيير الاسم", "طلب تغيير البريد الإلكتروني"],
+  replies: ["تم حل المشكلة، شكرًا لتواصلك", "سننظر في طلبك قريبًا", "تم تنفيذ طلبك", "للأسف لا يمكن تنفيذ هذا الطلب"],
+};
+async function viewSettings() {
+  V('<section class="card">...</section>');
+  try {
+    const [a, d, t] = await Promise.all([getDoc(doc(db, "config", "app")), getDoc(doc(db, "config", "daily")), getDoc(doc(db, "config", "texts"))]);
+    const A = a.exists() ? a.data() : {}, D = d.exists() ? d.data() : {}, T = t.exists() ? t.data() : DEF_TEXTS;
+    const ck = (id, v, label) => `<div class="row"><label><input id="${id}" type="checkbox" ${v ? "checked" : ""}> ${label}</label></div>`;
+    const nf = (id, v, label, min = 0) => `<div class="field"><label>${label}</label><input id="${id}" type="number" min="${min}" step="1" value="${v}" style="max-width:160px"></div>`;
+    V(`<section class="card"><h2>إعدادات النظام</h2>
+      ${ck("sApp", A.appOpen !== false, "التطبيق يعمل (إلغاؤه = وضع صيانة لكل الأعضاء)")}
+      ${ck("sReg", A.registrationOpen !== false, "التسجيل مفتوح")}
+      ${ck("sRew", A.rewardsOpen !== false, "المكافآت مفتوحة (مفتاح عام لكل المكاسب)")}
+      ${ck("sRank", A.showRanking === true, "إظهار تبويب الترتيب للأعضاء")}
+      ${nf("sCap", A.dailyCap ?? 200, "الحد الأقصى للتسجيل في اليوم (0 = بلا حد)")}
+      ${nf("sWelcome", A.welcomeBonus ?? 0, "مكافأة الترحيب عند التسجيل (نقاط)")}
+      ${nf("sRef", A.referralPoints ?? 0, "مكافأة الإحالة (تظهر لك فقط، الأعضاء لا يرونها)")}
+      <h2>المكافأة اليومية</h2>
+      ${ck("dOn", D.enabled === true, "مفعّلة")}
+      ${nf("dPts", D.points ?? 10, "نقاط المكافأة اليومية")}
+      ${nf("dHours", D.hours ?? 24, "الفاصل بين المكافأتين (ساعات)", 1)}
+      ${nf("dStreakDays", D.streakDays ?? 7, "أيام سلسلة الحضور", 2)}
+      ${nf("dStreakBonus", D.streakBonus ?? 0, "مكافأة السلسلة الإضافية (0 = معطّلة)")}
+      <h2>الرسائل الجاهزة (سطر لكل رسالة)</h2>
+      <div class="field"><label>رسائل يختارها العضو</label><textarea id="tReady">${esc((T.ready || []).join("\n"))}</textarea></div>
+      <div class="field"><label>طلبات يكتب العضو معها قيمة (مثل تغيير الاسم)</label><textarea id="tReq">${esc((T.requests || []).join("\n"))}</textarea></div>
+      <div class="field"><label>ردود جاهزة للإدارة</label><textarea id="tRep">${esc((T.replies || []).join("\n"))}</textarea></div>
+      <button id="sSave">حفظ كل الإعدادات</button>
+      <p class="muted">أول مرة: اضغط حفظ مرة واحدة لإنشاء الإعدادات والعدّاد. الأيام في الحد اليومي بالتوقيت العالمي (UTC).</p></section>`);
+    $("sSave").onclick = async () => {
+      const g = id => $(id).checked, n = id => Math.max(0, num($(id).value));
+      try {
+        const b = writeBatch(db);
+        b.set(doc(db, "config", "app"), { appOpen: g("sApp"), registrationOpen: g("sReg"), rewardsOpen: g("sRew"), showRanking: g("sRank"),
+          dailyCap: n("sCap"), welcomeBonus: n("sWelcome"), referralPoints: n("sRef") });
+        b.set(doc(db, "config", "daily"), { enabled: g("dOn"), points: n("dPts"), hours: Math.max(1, n("dHours")), streakDays: Math.max(2, n("dStreakDays")), streakBonus: n("dStreakBonus") });
+        b.set(doc(db, "config", "texts"), { ready: lines($("tReady").value), requests: lines($("tReq").value), replies: lines($("tRep").value) });
+        const c = await getDoc(doc(db, "counters", "members"));
+        if (!c.exists()) b.set(doc(db, "counters", "members"), { next: 1 });
+        const p = await getDoc(doc(db, "config", "public"));
+        if (!p.exists()) b.set(doc(db, "config", "public"), { announce: { on: false, text: "", link: "" }, code: { active: false } });
+        adminLog(b, "settings", null, `تسجيل:${g("sReg")} مكافآت:${g("sRew")} صيانة:${!g("sApp")} حد:${n("sCap")} ترحيب:${n("sWelcome")} يومي:${n("dPts")}/${n("dHours")}س`);
+        await b.commit(); say("تم حفظ الإعدادات.", "ok");
+      } catch { say("تعذّر الحفظ.", "err"); }
+    };
+  } catch { say("تعذّر تحميل الإعدادات.", "err"); }
+}
+
+// =====================================================================
+// سجل العمليات
+// =====================================================================
+let logLast = null;
+function viewLog() {
+  V(`<section class="card"><h2>سجل عمليات الإدارة</h2><div class="scroll"><table><thead><tr><th>الوقت</th><th>العملية</th><th>العضو</th><th>التفاصيل</th></tr></thead><tbody id="logRows"></tbody></table></div>
+    <div class="row"><button id="logNext" class="ghost">المزيد</button></div></section>`);
+  $("logNext").onclick = () => loadLog(false);
+  loadLog(true);
+}
+async function loadLog(reset) {
+  if (reset) logLast = null;
+  try {
+    const parts = [orderBy("at", "desc")];
+    if (logLast) parts.push(startAfter(logLast));
+    parts.push(limit(PAGE));
+    const snap = await getDocs(query(collection(db, "adminLog"), ...parts));
+    snap.forEach(x => {
+      const d = x.data(), tr = $("logRows").insertRow();
+      tr.insertCell().textContent = fmt(d.at); tr.insertCell().textContent = d.action;
+      tr.insertCell().textContent = d.memberNo ? pad(d.memberNo) : ""; tr.insertCell().textContent = d.details;
+    });
+    if (snap.size) logLast = snap.docs[snap.docs.length - 1];
+    $("logNext").disabled = snap.size < PAGE;
+  } catch { say("تعذّر تحميل السجل.", "err"); }
+}
+</script>
+</body>
+</html>
